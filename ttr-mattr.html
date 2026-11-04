@@ -1,0 +1,375 @@
+<!doctype html>
+<html lang="ko"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
+</head><body>
+<title>TTR과 MATTR</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Gowun+Batang:wght@700&family=IBM+Plex+Sans+KR:wght@400;500;600&family=IBM+Plex+Mono:wght@500&display=swap">
+<style>
+/* 강의 화면용 설명 페이지: 좁은 한 단, 절마다 [단어 줄 → 수치 → 그래프] 순서 */
+:root {
+  --bg: #f5f7f8;
+  --panel: #ffffff;
+  --ink: #17222b;
+  --muted: #5d6b76;
+  --line: #d6dde2;
+  --new: #0f7b6c;        /* 처음 나온 단어 */
+  --new-soft: #d7efe9;
+  --rep: #8a96a0;        /* 다시 나온 단어 */
+  --rep-soft: #eceff1;
+  --win: #c47a12;        /* MATTR 창 */
+  --win-soft: #fbecd2;
+  --f-display: "Gowun Batang", "Nanum Myeongjo", serif;
+  --f-body: "IBM Plex Sans KR", "Apple SD Gothic Neo", "Malgun Gothic", sans-serif;
+  --f-num: "IBM Plex Mono", ui-monospace, monospace;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --bg: #12181d; --panel: #1a2229; --ink: #e6ecef; --muted: #9aa8b2; --line: #2e3a43;
+    --new: #4fc3ad; --new-soft: #173a35; --rep: #7d8a94; --rep-soft: #252f37;
+    --win: #f0a742; --win-soft: #3b2c14; color-scheme: dark;
+  }
+}
+:root[data-theme="dark"] {
+  --bg: #12181d; --panel: #1a2229; --ink: #e6ecef; --muted: #9aa8b2; --line: #2e3a43;
+  --new: #4fc3ad; --new-soft: #173a35; --rep: #7d8a94; --rep-soft: #252f37;
+  --win: #f0a742; --win-soft: #3b2c14; color-scheme: dark;
+}
+* { box-sizing: border-box; }
+body {
+  background: var(--bg); color: var(--ink); font-family: var(--f-body); font-size: 16px; line-height: 1.65;
+  padding-left: max(16px, env(safe-area-inset-left, 0px)); padding-right: max(16px, env(safe-area-inset-right, 0px));
+  padding-block: 32px 56px;
+}
+main { max-width: 860px; margin: 0 auto; display: grid; gap: 28px; }
+header { display: grid; gap: 6px; }
+h1 { font-family: var(--f-display); font-size: clamp(30px, 6vw, 42px); line-height: 1.2; margin: 0; text-wrap: balance; }
+h2 { font-family: var(--f-display); font-size: 24px; line-height: 1.3; margin: 0; text-wrap: balance; }
+p { margin: 0; max-width: 65ch; }
+.lead { color: var(--muted); }
+section.panel { background: var(--panel); border: 1px solid var(--line); border-radius: 10px; padding: 22px clamp(16px, 3vw, 28px); display: grid; gap: 16px; min-width: 0; }
+.eyebrow { font-size: 13px; letter-spacing: .06em; color: var(--muted); font-weight: 600; }
+.src { font-size: 13px; color: var(--muted); }
+
+.controls { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
+button {
+  font: 500 14px var(--f-body); color: var(--ink); background: var(--bg); border: 1px solid var(--line);
+  border-radius: 6px; padding: 7px 14px; cursor: pointer;
+}
+button:hover { border-color: var(--muted); }
+button.primary { background: var(--ink); color: var(--panel); border-color: var(--ink); }
+button:focus-visible, input:focus-visible { outline: 2px solid var(--new); outline-offset: 2px; }
+label.slider { display: inline-flex; gap: 8px; align-items: center; font-size: 14px; color: var(--muted); }
+label.slider output { font-family: var(--f-num); color: var(--ink); min-width: 2ch; }
+
+.chips { display: flex; flex-wrap: wrap; gap: 6px; min-height: 40px; }
+.chip {
+  position: relative; font-size: 15px; padding: 3px 10px; border-radius: 5px; border: 1px solid transparent;
+  transition: background .25s, color .25s, border-color .25s, opacity .25s, transform .25s;
+}
+.chip.off { opacity: .18; background: transparent; border-color: var(--line); }
+.chip.new { background: var(--new-soft); color: var(--new); border-color: var(--new); font-weight: 600; }
+.chip.rep { background: var(--rep-soft); color: var(--rep); border-color: var(--line); }
+.chip.now { transform: translateY(-3px); box-shadow: 0 3px 0 var(--ink); }
+.chip.echo { border-color: var(--new); }
+.chip .n { position: absolute; top: -8px; right: -6px; font: 500 10px var(--f-num); background: var(--rep); color: var(--panel); border-radius: 8px; padding: 0 4px; }
+.chip.inwin { background: var(--win-soft); border-color: var(--win); color: var(--ink); }
+.chip.inwin.dup { color: var(--win); text-decoration: line-through; text-decoration-thickness: 1px; }
+.chip.dim { opacity: .35; }
+
+.legend { display: flex; flex-wrap: wrap; gap: 14px; font-size: 13px; color: var(--muted); }
+.legend span::before { content: ""; display: inline-block; width: 12px; height: 12px; border-radius: 3px; margin-right: 6px; vertical-align: -1px; border: 1px solid; }
+.lg-new::before { background: var(--new-soft); border-color: var(--new) !important; }
+.lg-rep::before { background: var(--rep-soft); border-color: var(--line) !important; }
+.lg-win::before { background: var(--win-soft); border-color: var(--win) !important; }
+
+.readout { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 12px; }
+.stat { border-top: 2px solid var(--line); padding-top: 6px; }
+.stat .k { font-size: 13px; color: var(--muted); }
+.stat .v { font: 500 26px var(--f-num); font-variant-numeric: tabular-nums; }
+.stat.key { border-top-color: var(--ink); }
+.formula { font-family: var(--f-num); font-size: 15px; background: var(--bg); border-radius: 6px; padding: 10px 14px; overflow-x: auto; white-space: nowrap; }
+.formula b { color: var(--new); font-weight: 500; }
+.formula i { color: var(--win); font-style: normal; }
+
+.chart { width: 100%; overflow-x: auto; }
+.chart svg { display: block; width: 100%; min-width: 320px; height: auto; }
+.chart text { font-family: var(--f-num); font-size: 11px; fill: var(--muted); }
+.chart .axis { stroke: var(--line); }
+.chart .grid { stroke: var(--line); stroke-dasharray: 2 4; }
+.note { border-left: 3px solid var(--ink); padding: 2px 0 2px 14px; }
+.note.win { border-color: var(--win); }
+code { font-family: var(--f-num); font-size: .92em; background: var(--bg); padding: 1px 5px; border-radius: 4px; }
+@media (prefers-reduced-motion: reduce) { .chip { transition: none; } .chip.now { transform: none; } }
+</style>
+
+<main>
+  <header>
+    <div class="eyebrow">한국어 텍스트 마이닝 · 어휘 계량</div>
+    <h1>TTR과 MATTR</h1>
+    <p class="lead">어휘 다양성은 “같은 말을 얼마나 되풀이하지 않고 쓰는가”를 재는 지표입니다. 김소월의 「산유화」로 두 지표가 어떻게 계산되는지 한 단어씩 따라가 봅니다.</p>
+  </header>
+
+  <section class="panel" id="p1">
+    <div class="eyebrow">1 · TTR (type-token ratio)</div>
+    <h2>지금까지 나온 단어 가운데 서로 다른 단어의 비율</h2>
+    <p>단어를 하나씩 읽어 가면서 <b>토큰</b>(나온 단어 전체 개수)과 <b>타입</b>(서로 다른 단어 개수)을 셉니다. 처음 나온 단어는 타입을 하나 늘리지만, 이미 나온 단어는 토큰만 늘립니다.</p>
+    <div class="controls">
+      <button class="primary" id="t-play">처음부터 재생</button>
+      <button id="t-step">한 단어씩</button>
+      <label class="slider">속도 <input type="range" id="t-speed" min="1" max="5" value="3"></label>
+    </div>
+    <div class="legend"><span class="lg-new">처음 나온 단어 (타입 +1)</span><span class="lg-rep">이미 나온 단어 (오른쪽 위 숫자: 나온 횟수)</span></div>
+    <div class="chips" id="t-chips"></div>
+    <div class="readout">
+      <div class="stat"><div class="k">토큰</div><div class="v" id="t-tok">0</div></div>
+      <div class="stat"><div class="k">타입</div><div class="v" id="t-typ">0</div></div>
+      <div class="stat key"><div class="k">TTR = 타입 ÷ 토큰</div><div class="v" id="t-ttr">–</div></div>
+    </div>
+    <div class="chart" id="t-chart"></div>
+    <p class="note">글이 길어질수록 이미 나온 단어가 다시 나올 일이 많아져서 TTR은 <b>점점 내려갑니다</b>. 그래서 TTR은 <b>길이가 다른 글끼리 비교할 수 없습니다.</b> 짧은 글이 늘 더 다양해 보입니다.</p>
+    <p class="src">단어: 「산유화」의 내용어(명사·동사·형용사·일반 부사), 용언은 기본형. 형태소 분석 결과에서 ‘갈’(가을), ‘우는’ 같은 분석 오류는 손으로 고쳤습니다.</p>
+  </section>
+
+  <section class="panel" id="p2">
+    <div class="eyebrow">2 · MATTR (moving-average TTR)</div>
+    <h2>같은 길이의 창을 밀어 가며 잰 TTR의 평균</h2>
+    <p>길이 문제를 피하려면 <b>언제나 같은 길이</b>로 재면 됩니다. 단어 <span id="w-label">10</span>개짜리 <b>창</b>을 한 칸씩 밀면서 창 안의 TTR을 재고, 그 값들을 평균합니다. 창 안에서 두 번째로 나온 단어는 줄을 그어 표시했습니다.</p>
+    <div class="controls">
+      <button class="primary" id="m-play">처음부터 재생</button>
+      <button id="m-step">한 칸씩</button>
+      <label class="slider">창 크기 <input type="range" id="m-win" min="4" max="20" value="10"><output id="m-win-out">10</output></label>
+      <label class="slider">속도 <input type="range" id="m-speed" min="1" max="5" value="3"></label>
+    </div>
+    <div class="legend"><span class="lg-win">지금 창 안의 단어</span></div>
+    <div class="chips" id="m-chips"></div>
+    <div class="readout">
+      <div class="stat"><div class="k">지금 창</div><div class="v" id="m-pos">–</div></div>
+      <div class="stat"><div class="k">창 안의 TTR</div><div class="v" id="m-cur">–</div></div>
+      <div class="stat key"><div class="k">MATTR = 창 TTR의 평균</div><div class="v" id="m-avg">–</div></div>
+    </div>
+    <div class="formula" id="m-formula"></div>
+    <div class="chart" id="m-chart"></div>
+    <p class="note win">창의 길이가 늘 같으므로 글 전체가 길든 짧든 <b>같은 조건으로</b> 잰 값입니다. 창 크기를 바꾸면 값도 바뀌므로, 비교할 때는 <b>같은 창 크기</b>를 써야 합니다(06 노트북의 <code>mattr(words, window=100)</code>).</p>
+  </section>
+
+  <section class="panel" id="p3">
+    <div class="eyebrow">3 · 길이를 늘려 보면</div>
+    <h2>글이 길어질 때 TTR은 내려가고 MATTR은 거의 그대로</h2>
+    <p>「진달래꽃」, 「초혼」, 「산유화」를 이어 붙여 읽어 나가면서, 앞에서부터 <i>n</i>개 단어까지의 TTR과 MATTR(창 10)을 함께 그립니다.</p>
+    <div class="controls">
+      <button class="primary" id="l-play">처음부터 그리기</button>
+    </div>
+    <div class="legend"><span style="--c: var(--new)" class="lg-line">TTR</span><span style="--c: var(--win)" class="lg-line">MATTR (창 10)</span></div>
+    <div class="chart" id="l-chart"></div>
+    <p class="note">TTR은 1.00에서 0.6 근처까지 계속 떨어집니다. MATTR은 처음 몇 단어를 지나면 0.8~0.9 사이에 머물고, 되풀이가 많은 「산유화」 구간에서만 조금 내려갑니다. <b>길이가 아니라 글의 성격</b>을 반영하는 쪽은 MATTR입니다.</p>
+  </section>
+</main>
+
+<style>
+.lg-line::before { background: var(--c) !important; border-color: var(--c) !important; height: 3px !important; width: 18px !important; border-radius: 2px !important; vertical-align: 4px !important; }
+</style>
+
+<script>
+const 산유화 = "산 꽃 피다 꽃 피다 가을 봄 여름 없이 꽃 피다 산 산 피다 꽃 저만치 혼자 피다 산 울다 작다 새 꽃 좋다 산 살다 산 꽃 지다 꽃 지다 가을 봄 여름 없이 꽃 지다".split(" ");
+const 진달래꽃 = "보다 역겹다 가다 때 말없이 고이 보내다 드리다 영변 약산 진달래꽃 아름 따다 가다 길 뿌리다 가다 걸음 걸음 놓이다 꽃 사뿐히 즈려밟다 가다 보다 역겹다 가다 때 죽다 아니 눈물 흘리다".split(" ");
+const 초혼 = "산산이 부서지다 이름 허공 헤어지다 이름 부르다 주인 없다 이름 부르다 죽다 이름 심중 남다 말 한마디 끝끝내 마저 하다 못 하다 사랑 사람 사랑 사람 붉다 해 서산마루 걸리다 사슴 무리 슬피 울다 떨어지다 앉다 산 위 이름 부르다 설움 겹다 부르다 설움 겹다 부르다 부르다 소리 비껴가다 하늘 땅 사이 너무 넓다 서다 자리 돌 되다 부르다 죽다 이름 사랑 사람 사랑 사람".split(" ");
+
+const NS = "http://www.w3.org/2000/svg";
+const reduce = matchMedia("(prefers-reduced-motion: reduce)").matches;
+const $ = id => document.getElementById(id);
+const f2 = x => x.toFixed(2);
+const ttr = w => new Set(w).size / w.length;
+const speedMs = el => [0, 900, 650, 420, 250, 120][+el.value];
+
+function el(tag, attrs = {}, parent) {
+  const e = document.createElementNS(NS, tag);
+  for (const [k, v] of Object.entries(attrs)) e.setAttribute(k, v);
+  if (parent) parent.appendChild(e);
+  return e;
+}
+
+/* 선 그래프 틀: x는 1..xmax, y는 ymin..1 */
+function frame(box, xmax, opts = {}) {
+  const W = 640, H = opts.h || 236, L = 40, R = 48, T = 12, B = 44;
+  const ymin = opts.ymin ?? 0;
+  box.innerHTML = "";
+  const svg = el("svg", { viewBox: `0 0 ${W} ${H}`, role: "img", "aria-label": opts.label || "" }, box);
+  const x = v => L + (v - 1) / Math.max(1, xmax - 1) * (W - L - R);
+  const y = v => T + (1 - (v - ymin) / (1 - ymin)) * (H - T - B);
+  const step = (1 - ymin) / 4;
+  for (let i = 0; i <= 4; i++) {
+    const v = ymin + step * i;
+    el("line", { x1: L, x2: W - R, y1: y(v), y2: y(v), class: i ? "grid" : "axis" }, svg);
+    el("text", { x: L - 6, y: y(v) + 4, "text-anchor": "end" }, svg).textContent = f2(v);
+  }
+  const xt = opts.xticks || [1, Math.round(xmax / 2), xmax];
+  for (const t of xt) el("text", { x: x(t), y: H - B + 16, "text-anchor": "middle" }, svg).textContent = t;
+  el("text", { x: (L + W - R) / 2, y: H - 6, "text-anchor": "middle" }, svg).textContent = opts.xlabel || "";
+  return { svg, x, y, W, H, L, R, T, B };
+}
+
+function path(fr, pts, color, width = 2.5) {
+  const d = pts.map((p, i) => `${i ? "L" : "M"}${fr.x(p[0]).toFixed(1)},${fr.y(p[1]).toFixed(1)}`).join("");
+  return el("path", { d, fill: "none", stroke: color, "stroke-width": width, "stroke-linejoin": "round", "stroke-linecap": "round" }, fr.svg);
+}
+const css = name => getComputedStyle(document.documentElement).getPropertyValue(name).trim();
+
+/* ---------- 1. TTR ---------- */
+const T = { words: 산유화, i: 산유화.length, timer: null };
+function tRender() {
+  const box = $("t-chips"); box.innerHTML = "";
+  const seen = new Map();
+  const cur = T.words[T.i - 1];
+  T.words.forEach((w, k) => {
+    const c = document.createElement("span");
+    c.className = "chip";
+    c.textContent = w;
+    if (k < T.i) {
+      const n = (seen.get(w) || 0) + 1; seen.set(w, n);
+      c.classList.add(n === 1 ? "new" : "rep");
+      if (n > 1) { const b = document.createElement("span"); b.className = "n"; b.textContent = n; c.appendChild(b); }
+      if (k === T.i - 1) c.classList.add("now");
+      else if (T.i < T.words.length && w === cur) c.classList.add("echo");
+    } else c.classList.add("off");
+    box.appendChild(c);
+  });
+  const part = T.words.slice(0, T.i);
+  const types = new Set(part).size;
+  $("t-tok").textContent = T.i;
+  $("t-typ").textContent = types;
+  $("t-ttr").textContent = T.i ? `${types}/${T.i} = ${f2(types / T.i)}` : "–";
+
+  const fr = frame($("t-chart"), T.words.length, { xlabel: "토큰 수", label: "토큰 수에 따른 TTR", xticks: [1, 10, 20, 30, T.words.length] });
+  const pts = [];
+  for (let n = 1; n <= T.i; n++) pts.push([n, ttr(T.words.slice(0, n))]);
+  if (pts.length) {
+    path(fr, pts, css("--new"));
+    const [lx, ly] = pts[pts.length - 1];
+    el("circle", { cx: fr.x(lx), cy: fr.y(ly), r: 5, fill: css("--new") }, fr.svg);
+  }
+}
+function tStop() { clearTimeout(T.timer); T.timer = null; $("t-play").textContent = "처음부터 재생"; }
+function tTick() {
+  if (T.i >= T.words.length) return tStop();
+  T.i++; tRender();
+  T.timer = setTimeout(tTick, speedMs($("t-speed")));
+}
+$("t-play").onclick = () => {
+  if (T.timer) return tStop();
+  if (reduce) { T.i = 0; tRender(); return; }
+  T.i = 0; tRender(); $("t-play").textContent = "멈춤";
+  T.timer = setTimeout(tTick, 300);
+};
+$("t-step").onclick = () => { tStop(); T.i = T.i >= T.words.length ? 1 : T.i + 1; tRender(); };
+
+/* ---------- 2. MATTR ---------- */
+const M = { words: 산유화, W: 10, pos: 0, timer: null };
+M.last = () => M.words.length - M.W;      // 마지막 창의 시작 위치
+M.pos = M.last();
+function mRender() {
+  const W = M.W, words = M.words;
+  $("w-label").textContent = W; $("m-win-out").textContent = W;
+  const vals = [];
+  for (let s = 0; s <= M.pos; s++) vals.push(ttr(words.slice(s, s + W)));
+
+  const box = $("m-chips"); box.innerHTML = "";
+  const inWin = new Set();
+  words.forEach((w, k) => {
+    const c = document.createElement("span");
+    c.className = "chip"; c.textContent = w;
+    if (k >= M.pos && k < M.pos + W) {
+      c.classList.add("inwin");
+      if (inWin.has(w)) c.classList.add("dup");
+      inWin.add(w);
+    } else c.classList.add("dim");
+    box.appendChild(c);
+  });
+
+  const total = M.last() + 1;
+  const win = words.slice(M.pos, M.pos + W);
+  const types = new Set(win).size;
+  const avg = vals.reduce((a, b) => a + b, 0) / vals.length;
+  $("m-pos").textContent = `${M.pos + 1} / ${total}`;
+  $("m-cur").textContent = `${types}/${W} = ${f2(types / W)}`;
+  $("m-avg").textContent = f2(avg);
+
+  const shown = vals.length <= 6 ? vals.map(f2) : [...vals.slice(0, 3).map(f2), "…", ...vals.slice(-2).map(f2)];
+  $("m-formula").innerHTML = `MATTR = ( ${shown.join(" + ")} ) ÷ <i>${vals.length}</i> = <b>${f2(avg)}</b>`;
+
+  /* 창마다 막대 + 누적 평균 선 */
+  const fr = frame($("m-chart"), total, { ymin: 0, xlabel: "창 번호", label: "창마다의 TTR과 그 평균", xticks: [1, Math.ceil(total / 2), total] });
+  const bw = Math.max(3, (fr.W - fr.L - fr.R) / total * 0.6);
+  vals.forEach((v, s) => {
+    el("rect", { x: fr.x(s + 1) - bw / 2, y: fr.y(v), width: bw, height: fr.y(0) - fr.y(v), rx: 2,
+      fill: css(s === M.pos ? "--win" : "--win-soft"), stroke: css("--win"), "stroke-width": s === M.pos ? 0 : 1 }, fr.svg);
+  });
+  const run = []; let acc = 0;
+  vals.forEach((v, s) => { acc += v; run.push([s + 1, acc / (s + 1)]); });
+  path(fr, run, css("--ink"), 2);
+  const [ax, ay] = run[run.length - 1];
+  el("circle", { cx: fr.x(ax), cy: fr.y(ay), r: 4.5, fill: css("--ink") }, fr.svg);
+  const lab = el("text", { x: Math.min(fr.x(ax) + 8, fr.W - 70), y: fr.y(ay) - 8 }, fr.svg);
+  lab.textContent = `평균 ${f2(ay)}`; lab.style.fill = css("--ink");
+}
+function mStop() { clearTimeout(M.timer); M.timer = null; $("m-play").textContent = "처음부터 재생"; }
+function mTick() {
+  if (M.pos >= M.last()) return mStop();
+  M.pos++; mRender();
+  M.timer = setTimeout(mTick, speedMs($("m-speed")) * 1.4);
+}
+$("m-play").onclick = () => {
+  if (M.timer) return mStop();
+  M.pos = 0; mRender();
+  if (reduce) return;
+  $("m-play").textContent = "멈춤";
+  M.timer = setTimeout(mTick, 700);
+};
+$("m-step").onclick = () => { mStop(); M.pos = M.pos >= M.last() ? 0 : M.pos + 1; mRender(); };
+$("m-win").oninput = e => { mStop(); M.W = +e.target.value; M.pos = M.last(); mRender(); };
+
+/* ---------- 3. 길이 ---------- */
+const all = [...진달래꽃, ...초혼, ...산유화];
+const LW = 10;
+const series = { ttr: [], mattr: [] };
+for (let n = 1; n <= all.length; n++) {
+  const w = all.slice(0, n);
+  series.ttr.push([n, ttr(w)]);
+  if (n >= LW) {
+    let s = 0;
+    for (let i = 0; i + LW <= n; i++) s += ttr(w.slice(i, i + LW));
+    series.mattr.push([n, s / (n - LW + 1)]);
+  }
+}
+const bounds = [[1, "진달래꽃"], [진달래꽃.length + 1, "초혼"], [진달래꽃.length + 초혼.length + 1, "산유화"]];
+let L = { upto: all.length, timer: null };
+function lRender() {
+  const fr = frame($("l-chart"), all.length, { ymin: 0.4, h: 266, xlabel: "앞에서부터 읽은 단어 수", label: "글 길이에 따른 TTR과 MATTR", xticks: [1, 50, 100, all.length] });
+  bounds.forEach(([b, name], i) => {
+    if (i) el("line", { x1: fr.x(b), x2: fr.x(b), y1: fr.T, y2: fr.H - fr.B, class: "grid" }, fr.svg);
+    const t = el("text", { x: fr.x(b) + 5, y: fr.T + 12 }, fr.svg); t.textContent = name;
+  });
+  path(fr, series.ttr.filter(p => p[0] <= L.upto), css("--new"));
+  path(fr, series.mattr.filter(p => p[0] <= L.upto), css("--win"));
+  for (const [s, c] of [[series.ttr, "--new"], [series.mattr, "--win"]]) {
+    const p = s.filter(q => q[0] <= L.upto).pop();
+    if (!p) continue;
+    el("circle", { cx: fr.x(p[0]), cy: fr.y(p[1]), r: 4.5, fill: css(c) }, fr.svg);
+    const t = el("text", { x: Math.min(fr.x(p[0]) + 8, fr.W - 34), y: fr.y(p[1]) + 4 }, fr.svg);
+    t.textContent = f2(p[1]); t.style.fill = css(c);
+  }
+}
+$("l-play").onclick = () => {
+  clearTimeout(L.timer);
+  if (reduce) { L.upto = all.length; return lRender(); }
+  L.upto = 1;
+  const tick = () => { lRender(); if (L.upto < all.length) { L.upto += 1; L.timer = setTimeout(tick, 45); } };
+  tick();
+};
+
+function renderAll() { tRender(); mRender(); lRender(); }
+renderAll();
+matchMedia("(prefers-color-scheme: dark)").addEventListener("change", renderAll);
+new MutationObserver(renderAll).observe(document.documentElement, { attributes: true, attributeFilter: ["data-theme"] });
+</script>
+</body></html>
