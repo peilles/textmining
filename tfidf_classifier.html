@@ -139,7 +139,7 @@ svg .dot { fill: var(--hi); stroke: var(--panel); stroke-width: 2; transition: c
 </header>
 
 <!-- 1. DTM -->
-<section class="panel" aria-labelledby="s1">
+<section class="panel" id="dtm" aria-labelledby="s1">
   <div class="eyebrow">1 · 단어 주머니</div>
   <h2 id="s1">문서-단어 행렬 만들기</h2>
   <p>형태소 분석 결과에서 형태소를 하나씩 꺼내 표의 열에 넣고 개수를 셉니다. 순서는 버리고 개수만 남기므로 <b>단어 주머니(bag of words)</b>라고 합니다.</p>
@@ -155,7 +155,7 @@ svg .dot { fill: var(--hi); stroke: var(--panel); stroke-width: 2; transition: c
 </section>
 
 <!-- 1b. 단어 주머니의 한계 -->
-<section class="panel" aria-labelledby="s1b">
+<section class="panel" id="bag" aria-labelledby="s1b">
   <div class="eyebrow">2 · 단어 주머니의 한계</div>
   <h2 id="s1b">뜻이 다른데 숫자는 똑같은 두 글</h2>
   <p>단어 주머니는 순서를 버립니다. 그래서 같은 형태소를 다른 순서로 쓴 두 글은 <b>완전히 같은 숫자</b>가 됩니다.</p>
@@ -170,7 +170,7 @@ svg .dot { fill: var(--hi); stroke: var(--panel); stroke-width: 2; transition: c
 </section>
 
 <!-- 2. IDF -->
-<section class="panel" aria-labelledby="s2">
+<section class="panel" id="idf" aria-labelledby="s2">
   <div class="eyebrow">3 · TF-IDF</div>
   <h2 id="s2">많은 글에 나오는 형태소는 값을 깎는다</h2>
   <div class="formula">TF-IDF = TF × IDF &nbsp;&nbsp; IDF = ln((1 + N) ÷ (1 + DF)) + 1</div>
@@ -198,7 +198,7 @@ svg .dot { fill: var(--hi); stroke: var(--panel); stroke-width: 2; transition: c
 </section>
 
 <!-- 3. 분류기 -->
-<section class="panel" aria-labelledby="s3">
+<section class="panel" id="classifier" aria-labelledby="s3">
   <div class="eyebrow">4 · 로지스틱 회귀와 softmax</div>
   <h2 id="s3">형태소마다 가중치를 곱해 더하면 점수가 된다</h2>
   <div class="formula">z(부류) = Σ (형태소의 TF-IDF × 그 부류에서의 가중치) + b &nbsp;&nbsp; P(부류) = e^z ÷ Σ e^z</div>
@@ -224,7 +224,7 @@ svg .dot { fill: var(--hi); stroke: var(--panel); stroke-width: 2; transition: c
 </section>
 
 <!-- 4. 혼동 행렬 -->
-<section class="panel" aria-labelledby="s4">
+<section class="panel" id="eval" aria-labelledby="s4">
   <div class="eyebrow">5 · 평가</div>
   <h2 id="s4">정밀도와 재현율</h2>
   <p>시험 데이터 1,440편의 혼동 행렬입니다. 행은 정답, 열은 예측입니다. 부류를 고르면 정밀도는 <b>열</b>에서, 재현율은 <b>행</b>에서 계산합니다.</p>

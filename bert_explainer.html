@@ -130,7 +130,7 @@ th { font-weight: 600; color: var(--muted); font-size: 13px; }
 </header>
 
 <!-- 1. 토큰 -->
-<section class="panel" aria-labelledby="s1">
+<section class="panel" id="tokens" aria-labelledby="s1">
   <div class="eyebrow">1 · 토큰</div>
   <h2 id="s1">형태소 분석기 대신 글자 덩어리로 자른다</h2>
   <p>BERT는 큰 말뭉치에서 자주 나오는 글자 덩어리(<b>서브워드</b>)를 미리 정해 두고, 그 목록으로 글을 자릅니다. 목록에 없는 말은 더 잘게 쪼갭니다. <code>##</code>은 앞 조각에 붙어 있었다는 표시입니다.</p>
@@ -141,7 +141,7 @@ th { font-weight: 600; color: var(--muted); font-size: 13px; }
 </section>
 
 <!-- 2. 사전 학습 -->
-<section class="panel" aria-labelledby="s2">
+<section class="panel" id="pretrain" aria-labelledby="s2">
   <div class="eyebrow">2 · 사전 학습</div>
   <h2 id="s2">가려 놓은 낱말 맞히기를 수없이 되풀이한다 <span class="tag">그림 설명용 예시 값</span></h2>
   <p>뉴스, 위키백과 등 아주 많은 한국어 글에서 토큰 일부를 <b>[MASK]</b>로 가리고, 앞뒤 문맥만 보고 가린 토큰을 맞히게 합니다. 틀린 만큼 가중치를 조금씩 고칩니다. 정답이 글 안에 있으므로 사람이 라벨을 달 필요가 없습니다.</p>
@@ -156,7 +156,7 @@ th { font-weight: 600; color: var(--muted); font-size: 13px; }
 </section>
 
 <!-- 3. 문맥 벡터 -->
-<section class="panel" aria-labelledby="s3">
+<section class="panel" id="vectors" aria-labelledby="s3">
   <div class="eyebrow">3 · 문맥에 따른 벡터</div>
   <h2 id="s3">같은 ‘배’도 문맥에 따라 다른 벡터가 된다</h2>
   <p>‘배’가 든 문장 12개를 모델에 넣고, 층마다 ‘배’ 토큰의 벡터(숫자 768개)를 꺼내 2차원으로 줄여 찍었습니다(<a href="concepts_basics.html#pca">주성분 분석</a>). 0층은 문맥이 섞이기 전의 입력이라 뜻과 관계없이 같은 벡터이고(위치 정보만 조금 다름), 층을 지날수록 앞뒤 낱말의 정보가 섞이면서 뜻에 따라 무리가 갈립니다.</p>
@@ -177,7 +177,7 @@ th { font-weight: 600; color: var(--muted); font-size: 13px; }
 </section>
 
 <!-- 4. 어텐션 -->
-<section class="panel" aria-labelledby="s4">
+<section class="panel" id="attention" aria-labelledby="s4">
   <div class="eyebrow">4 · 셀프 어텐션</div>
   <h2 id="s4">각 토큰은 문장의 다른 토큰을 얼마나 참고할지 정한다</h2>
   <p class="note">어텐션 가중치를 곱해 더하는 것은 <a href="concepts_basics.html#wsum">가중합</a>입니다.</p>
@@ -192,7 +192,7 @@ th { font-weight: 600; color: var(--muted); font-size: 13px; }
 </section>
 
 <!-- 5. 미세 조정 -->
-<section class="panel" aria-labelledby="s5">
+<section class="panel" id="finetune" aria-labelledby="s5">
   <div class="eyebrow">5 · 미세 조정과 분류</div>
   <h2 id="s5">[CLS] 벡터 하나로 모국어를 판단한다</h2>
   <p>문장 맨 앞에 붙인 <b>[CLS]</b> 토큰의 마지막 층 벡터가 문장 전체를 대표합니다. 그 위에 분류층(768 → 3)을 얹고, 정답이 달린 학습자 글로 모델 전체를 조금 더 학습시킨 것이 <b>미세 조정</b>입니다.</p>
@@ -212,7 +212,7 @@ th { font-weight: 600; color: var(--muted); font-size: 13px; }
 </section>
 
 <!-- 6. BERT와 GPT -->
-<section class="panel" aria-labelledby="s6g">
+<section class="panel" id="gpt" aria-labelledby="s6g">
   <div class="eyebrow">6 · BERT와 GPT</div>
   <h2 id="s6g">빈칸 맞히기와 다음 말 맞히기 <span class="tag">그림 설명용 예시 값</span></h2>
   <p>ChatGPT, Claude 같은 대규모 언어 모델(LLM)도 BERT와 같은 트랜스포머로 만들지만 사전 학습 과제가 다릅니다. BERT는 문장 가운데의 <b>빈칸</b>을 앞뒤 문맥을 모두 보고 맞힙니다. GPT 계열은 <b>왼쪽만 보고 다음 토큰</b>을 맞힙니다. 다음 토큰을 하나 고르고, 그것을 붙여 다시 다음 토큰을 맞히기를 되풀이하면 글이 만들어집니다.</p>
@@ -245,7 +245,7 @@ th { font-weight: 600; color: var(--muted); font-size: 13px; }
 </section>
 
 <!-- 6. 비교 -->
-<section class="panel" aria-labelledby="s6">
+<section class="panel" id="compare" aria-labelledby="s6">
   <div class="eyebrow">7 · 정리</div>
   <h2 id="s6">단어 주머니와 BERT</h2>
   <div class="scroll"><table>
