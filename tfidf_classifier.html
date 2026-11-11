@@ -1,0 +1,435 @@
+<!doctype html>
+<html lang="ko"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>TF-IDF와 분류기</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Gowun+Batang:wght@700&family=IBM+Plex+Sans+KR:wght@400;500;600&family=IBM+Plex+Mono:wght@500&display=swap">
+<style>
+/* 강의 화면용 설명 페이지 (TTR·MATTR 자료와 같은 틀): 좁은 한 단, 절마다 [조작 → 표·막대 → 한 줄 설명] */
+:root {
+  --bg: #f5f7f8; --panel: #ffffff; --ink: #17222b; --muted: #5d6b76; --line: #d6dde2; --soft: #eef2f4;
+  --vi: #0f7b6c; --vi-soft: #d7efe9;   /* 베트남어 */
+  --ja: #b4452f; --ja-soft: #f6ded8;   /* 일본어 */
+  --zh: #3c5fa8; --zh-soft: #dde5f5;   /* 중국어 */
+  --hi: #c47a12; --hi-soft: #fbecd2;   /* 강조 */
+  --f-display: "Gowun Batang", "Nanum Myeongjo", serif;
+  --f-body: "IBM Plex Sans KR", "Apple SD Gothic Neo", "Malgun Gothic", sans-serif;
+  --f-num: "IBM Plex Mono", ui-monospace, monospace;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --bg: #12181d; --panel: #1a2229; --ink: #e6ecef; --muted: #9aa8b2; --line: #2e3a43; --soft: #222c34;
+    --vi: #4fc3ad; --vi-soft: #173a35; --ja: #ef8a72; --ja-soft: #3d2420; --zh: #8aa7e8; --zh-soft: #1f2a42;
+    --hi: #f0a742; --hi-soft: #3b2c14; color-scheme: dark;
+  }
+}
+:root[data-theme="dark"] {
+  --bg: #12181d; --panel: #1a2229; --ink: #e6ecef; --muted: #9aa8b2; --line: #2e3a43; --soft: #222c34;
+  --vi: #4fc3ad; --vi-soft: #173a35; --ja: #ef8a72; --ja-soft: #3d2420; --zh: #8aa7e8; --zh-soft: #1f2a42;
+  --hi: #f0a742; --hi-soft: #3b2c14; color-scheme: dark;
+}
+* { box-sizing: border-box; }
+body {
+  margin: 0; background: var(--bg); color: var(--ink); font-family: var(--f-body); font-size: 16px; line-height: 1.65;
+  padding-left: max(16px, env(safe-area-inset-left, 0px)); padding-right: max(16px, env(safe-area-inset-right, 0px));
+  padding-block: 32px 56px;
+}
+main { max-width: 880px; margin: 0 auto; display: grid; gap: 28px; }
+header { display: grid; gap: 6px; }
+h1 { font-family: var(--f-display); font-size: clamp(30px, 6vw, 42px); line-height: 1.2; margin: 0; text-wrap: balance; }
+h2 { font-family: var(--f-display); font-size: 24px; line-height: 1.3; margin: 0; text-wrap: balance; }
+p { margin: 0; max-width: 68ch; }
+.lead { color: var(--muted); }
+section.panel { background: var(--panel); border: 1px solid var(--line); border-radius: 10px; padding: 22px clamp(16px, 3vw, 28px); display: grid; gap: 16px; min-width: 0; }
+.eyebrow { font-size: 13px; letter-spacing: .06em; color: var(--muted); font-weight: 600; }
+.note { font-size: 14px; color: var(--muted); }
+.formula { font-family: var(--f-num); font-size: 15px; background: var(--soft); border-radius: 6px; padding: 10px 14px; overflow-x: auto; white-space: nowrap; }
+.controls { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
+button {
+  font: 500 14px var(--f-body); color: var(--ink); background: var(--bg); border: 1px solid var(--line);
+  border-radius: 6px; padding: 7px 14px; cursor: pointer;
+}
+button:hover { border-color: var(--muted); }
+button.primary { background: var(--ink); color: var(--panel); border-color: var(--ink); }
+button[aria-pressed="true"] { background: var(--hi-soft); border-color: var(--hi); }
+button:focus-visible, input:focus-visible, select:focus-visible { outline: 2px solid var(--hi); outline-offset: 2px; }
+label.slider { display: inline-flex; gap: 8px; align-items: center; font-size: 14px; color: var(--muted); flex-wrap: wrap; }
+label.slider output { font-family: var(--f-num); color: var(--ink); min-width: 3ch; }
+select { font: 500 14px var(--f-body); color: var(--ink); background: var(--bg); border: 1px solid var(--line); border-radius: 6px; padding: 6px 10px; max-width: 100%; }
+.scroll { overflow-x: auto; }
+table { border-collapse: collapse; font-size: 14px; font-variant-numeric: tabular-nums; }
+th, td { border-bottom: 1px solid var(--line); padding: 5px 8px; text-align: center; white-space: nowrap; }
+th { font-weight: 600; color: var(--muted); font-size: 13px; }
+td.num { font-family: var(--f-num); font-size: 13px; transition: background .35s, color .35s; }
+td.zero { color: var(--line); }
+td.flash { background: var(--hi-soft); }
+th.rowh { text-align: left; color: var(--ink); }
+
+/* 1. 문서-단어 행렬 */
+.sents { display: grid; gap: 6px; }
+.sent { display: flex; flex-wrap: wrap; gap: 5px; align-items: center; }
+.sent .lab { font-size: 13px; color: var(--muted); width: 3.2em; }
+.tok { font-size: 14px; padding: 2px 8px; border-radius: 5px; border: 1px solid var(--line); background: var(--bg); transition: opacity .3s, background .3s, transform .3s; }
+.tok.done { opacity: .35; }
+.tok.flyin { animation: fly .5s ease both; }
+@keyframes fly { from { opacity: 0; transform: translateY(-14px) scale(.9); } to { opacity: 1; transform: none; } }
+.tok.now { background: var(--hi-soft); border-color: var(--hi); transform: translateY(-3px); }
+
+/* 2. IDF 곡선 */
+.two { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 20px; align-items: start; }
+@media (max-width: 680px) { .two { grid-template-columns: minmax(0, 1fr); } }
+svg text { fill: var(--muted); font-family: var(--f-num); font-size: 11px; }
+svg .axis { stroke: var(--line); }
+svg .curve { stroke: var(--hi); fill: none; stroke-width: 2.5; }
+svg .dot { fill: var(--hi); stroke: var(--panel); stroke-width: 2; transition: cx .3s, cy .3s; }
+.big { font-family: var(--f-num); font-size: 28px; }
+
+/* 막대 */
+.bars { display: grid; gap: 6px; }
+.bar { display: grid; grid-template-columns: 7.5em minmax(0, 1fr) 4.5em; gap: 8px; align-items: center; font-size: 14px; }
+.bar .track { height: 18px; background: var(--soft); border-radius: 4px; overflow: hidden; }
+.bar .fill { height: 100%; width: 0; background: var(--hi); border-radius: 4px; transition: width .5s ease; }
+.bar .val { font-family: var(--f-num); font-size: 13px; text-align: right; }
+.bar.vi .fill { background: var(--vi); } .bar.ja .fill { background: var(--ja); } .bar.zh .fill { background: var(--zh); }
+
+/* 3. 분류기 */
+.chips { display: flex; flex-wrap: wrap; gap: 6px; }
+.chip { font-size: 14px; padding: 3px 9px; border-radius: 5px; border: 1px solid var(--line); background: var(--bg); color: var(--ink); cursor: pointer; transition: opacity .25s, background .25s, border-color .25s; }
+.chip small { font-family: var(--f-num); font-size: 11px; margin-left: 4px; color: var(--muted); }
+.chip.off { opacity: .3; text-decoration: line-through; }
+.chip.unk { cursor: default; border-style: dashed; color: var(--muted); }
+.chip.c0 { background: var(--vi-soft); border-color: var(--vi); }
+.chip.c1 { background: var(--ja-soft); border-color: var(--ja); }
+.chip.c2 { background: var(--zh-soft); border-color: var(--zh); }
+.legend { display: flex; flex-wrap: wrap; gap: 14px; font-size: 13px; color: var(--muted); }
+.legend span::before { content: ""; display: inline-block; width: 12px; height: 12px; border-radius: 3px; margin-right: 6px; vertical-align: -1px; }
+.lg-vi::before { background: var(--vi); } .lg-ja::before { background: var(--ja); } .lg-zh::before { background: var(--zh); }
+.stack { display: grid; gap: 10px; }
+.zrow { display: grid; grid-template-columns: 4.5em minmax(0, 1fr) 4.2em; gap: 8px; align-items: center; font-size: 14px; }
+.zaxis { position: relative; height: 22px; background: var(--soft); border-radius: 4px; overflow: hidden; }
+.zaxis .mid { position: absolute; left: 50%; top: 0; bottom: 0; width: 1px; background: var(--muted); opacity: .5; }
+.seg { position: absolute; top: 3px; bottom: 3px; border-radius: 2px; transition: left .5s ease, width .5s ease; }
+.seg.pos { background: var(--hi); opacity: .85; } .seg.neg { background: var(--muted); opacity: .45; }
+.seg.top { outline: 2px solid var(--ink); }
+.zval { font-family: var(--f-num); font-size: 13px; text-align: right; }
+.verdict { font-size: 18px; font-weight: 600; }
+.verdict b { font-family: var(--f-display); font-size: 22px; }
+
+/* 4. 혼동 행렬 */
+.cm td.cell { font-family: var(--f-num); font-size: 15px; width: 5.5em; height: 2.6em; transition: background .3s, outline-color .3s; outline: 2px solid transparent; outline-offset: -2px; }
+.cm td.diag { font-weight: 600; }
+.cm td.inrow { background: var(--zh-soft); }
+.cm td.incol { background: var(--hi-soft); }
+.cm td.inrow.incol { outline-color: var(--ink); }
+.readout { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 10px; }
+.stat { border: 1px solid var(--line); border-radius: 8px; padding: 10px 12px; display: grid; gap: 2px; }
+.stat .k { font-size: 13px; color: var(--muted); }
+.stat .v { font-family: var(--f-num); font-size: 22px; }
+.stat .f { font-family: var(--f-num); font-size: 12px; color: var(--muted); }
+@media (prefers-reduced-motion: reduce) { * { transition: none !important; } }
+</style>
+</head><body>
+<main>
+<header>
+  <div class="eyebrow">한국어 텍스트 마이닝 · 문서 분류</div>
+  <h1>TF-IDF와 분류기</h1>
+  <p class="lead">글을 숫자로 바꾸고(문서-단어 행렬, TF-IDF), 그 숫자에 가중치를 곱해 모국어를 판단하는 과정을 단계별로 봅니다. 4~5절의 숫자는 수업 노트북에서 학습한 실제 분류기(시험 정확도 83.3%)의 값입니다.</p>
+  <p class="note">벡터, 로그, 가중합, softmax가 낯설면 먼저 <a href="concepts_basics.html">문서 분류의 기초 개념</a>을 보세요. 이어서 볼 자료: <a href="bert_explainer.html">BERT는 글을 어떻게 읽나</a></p>
+</header>
+
+<!-- 1. DTM -->
+<section class="panel" aria-labelledby="s1">
+  <div class="eyebrow">1 · 단어 주머니</div>
+  <h2 id="s1">문서-단어 행렬 만들기</h2>
+  <p>형태소 분석 결과에서 형태소를 하나씩 꺼내 표의 열에 넣고 개수를 셉니다. 순서는 버리고 개수만 남기므로 <b>단어 주머니(bag of words)</b>라고 합니다.</p>
+  <div class="sents" id="dtmSents"></div>
+  <div class="controls">
+    <button class="primary" id="dtmPlay">재생</button>
+    <button id="dtmStep">한 개씩</button>
+    <button id="dtmReset">처음부터</button>
+    <span class="note" id="dtmMsg"></span>
+  </div>
+  <div class="scroll"><table id="dtmTable"></table></div>
+  <p class="note">‘을/JKO’와 ‘를/JKO’는 다른 열이고, ‘저는’과 ‘친구는’의 ‘는/JX’는 같은 열입니다. 형태와 품사를 함께 열 이름으로 썼기 때문입니다.</p>
+</section>
+
+<!-- 1b. 단어 주머니의 한계 -->
+<section class="panel" aria-labelledby="s1b">
+  <div class="eyebrow">2 · 단어 주머니의 한계</div>
+  <h2 id="s1b">뜻이 다른데 숫자는 똑같은 두 글</h2>
+  <p>단어 주머니는 순서를 버립니다. 그래서 같은 형태소를 다른 순서로 쓴 두 글은 <b>완전히 같은 숫자</b>가 됩니다.</p>
+  <div class="controls" role="group" aria-label="예문">
+    <button id="bp0" aria-pressed="true">누가 누구를</button>
+    <button id="bp1" aria-pressed="false">재미있다? 지루하다?</button>
+    <button class="primary" id="bagBtn">주머니에 넣기</button>
+  </div>
+  <div class="sents" id="bagSents"></div>
+  <div class="scroll"><table id="bagTable"></table></div>
+  <p class="note" id="bagMsg"></p>
+</section>
+
+<!-- 2. IDF -->
+<section class="panel" aria-labelledby="s2">
+  <div class="eyebrow">3 · TF-IDF</div>
+  <h2 id="s2">많은 글에 나오는 형태소는 값을 깎는다</h2>
+  <div class="formula">TF-IDF = TF × IDF &nbsp;&nbsp; IDF = ln((1 + N) ÷ (1 + DF)) + 1</div>
+  <p class="note">ln(로그)이 낯설면 <a href="concepts_basics.html#log">기초 개념 3절</a>을 보세요.</p>
+  <p>TF는 그 글에 나온 횟수, N은 전체 글 수, DF는 그 형태소가 나온 글 수입니다. DF가 클수록 IDF가 작아집니다.</p>
+  <div class="two">
+    <div class="stack">
+      <label class="slider" for="nIn">전체 글 수 N <input id="nIn" type="range" min="3" max="1000" value="5760"><output id="nOut"></output></label>
+      <label class="slider" for="dfIn">나온 글 수 DF <input id="dfIn" type="range" min="1" max="5760" value="1"><output id="dfOut"></output></label>
+      <div><span class="note">IDF</span> <span class="big" id="idfOut"></span></div>
+      <p class="note" id="idfMsg"></p>
+    </div>
+    <svg id="idfSvg" viewBox="0 0 360 220" role="img" aria-label="DF에 따른 IDF 곡선"></svg>
+  </div>
+  <p class="note">수업 자료(훈련 글 5,760편)의 실제 IDF 예: <span id="idfExamples"></span></p>
+
+  <h2>세 문장에 적용하기</h2>
+  <div class="controls" role="group" aria-label="단계">
+    <button id="tfA" aria-pressed="true">① TF (개수)</button>
+    <button id="tfB" aria-pressed="false">② × IDF</button>
+    <button id="tfC" aria-pressed="false">③ 길이 맞추기 (L2)</button>
+  </div>
+  <div class="scroll"><table id="tfTable"></table></div>
+  <p class="note" id="tfMsg"></p>
+</section>
+
+<!-- 3. 분류기 -->
+<section class="panel" aria-labelledby="s3">
+  <div class="eyebrow">4 · 로지스틱 회귀와 softmax</div>
+  <h2 id="s3">형태소마다 가중치를 곱해 더하면 점수가 된다</h2>
+  <div class="formula">z(부류) = Σ (형태소의 TF-IDF × 그 부류에서의 가중치) + b &nbsp;&nbsp; P(부류) = e^z ÷ Σ e^z</div>
+  <div class="controls">
+    <label class="slider" for="sentSel">문장 <select id="sentSel"></select></label>
+    <button id="restore">모든 형태소 되살리기</button>
+  </div>
+  <p class="note">형태소를 누르면 분류기가 그 형태소를 보지 못하게 됩니다. 색은 그 형태소가 가장 크게 밀어 주는 부류이고, 작은 숫자는 그 부류에 대한 기여도입니다. 점선은 학습 자료에 3편 미만으로 나와 특성에 없는 형태소입니다.</p>
+  <div class="chips" id="chips"></div>
+  <div class="legend"><span class="lg-vi">베트남어</span><span class="lg-ja">일본어</span><span class="lg-zh">중국어</span></div>
+  <div class="two">
+    <div class="stack">
+      <div class="eyebrow">점수 z: 형태소별 기여의 합</div>
+      <div id="zRows" class="stack"></div>
+      <p class="note">막대 조각 하나가 형태소 하나의 기여입니다. 가운데 선 오른쪽(주황)은 점수를 올리고 왼쪽(회색)은 내립니다. 테두리가 굵은 조각이 가장 큰 기여입니다.</p>
+    </div>
+    <div class="stack">
+      <div class="eyebrow">확률: softmax</div>
+      <div class="bars" id="pBars"></div>
+      <div class="verdict" id="verdict"></div>
+    </div>
+  </div>
+</section>
+
+<!-- 4. 혼동 행렬 -->
+<section class="panel" aria-labelledby="s4">
+  <div class="eyebrow">5 · 평가</div>
+  <h2 id="s4">정밀도와 재현율</h2>
+  <p>시험 데이터 1,440편의 혼동 행렬입니다. 행은 정답, 열은 예측입니다. 부류를 고르면 정밀도는 <b>열</b>에서, 재현율은 <b>행</b>에서 계산합니다.</p>
+  <div class="controls" role="group" aria-label="부류" id="cmBtns"></div>
+  <div class="scroll"><table class="cm" id="cmTable"></table></div>
+  <div class="readout" id="cmStats"></div>
+</section>
+
+<p class="note">자료: 한국어 학습자 말뭉치 1~3급(베트남어·중국어·일본어 학습자 글 각 2,400편). 형태소 분석 Kiwi, TfidfVectorizer(min_df=3), LogisticRegression(scikit-learn).</p>
+</main>
+
+<script>
+const D = {"classes": ["베트남어", "일본어", "중국어"], "intercept": [-0.145, -0.1326, 0.2776], "sents": [{"text": "저는 주말에 친구와 같이 하노이에 가서 쌀국수를 먹었습니다.", "toks": [{"m": "저/NP", "idf": 1.5241, "w": [0.7993, -2.1818, 1.3825]}, {"m": "는/JX", "idf": 1.0544, "w": [0.4101, 1.4218, -1.8319]}, {"m": "주말/NNG", "idf": 3.1561, "w": [-0.2589, 0.0422, 0.2167]}, {"m": "에/JKB", "idf": 1.0253, "w": [0.1089, -0.0851, -0.0238]}, {"m": "친구/NNG", "idf": 1.6396, "w": [-1.1214, 0.0005, 1.1209]}, {"m": "와/JKB", "idf": 2.6486, "w": [-0.7686, 0.9322, -0.1636]}, {"m": "같이/MAG", "idf": 1.9478, "w": [0.788, -1.5375, 0.7495]}, {"m": "하노이/NNP", "idf": 4.8147, "w": [1.9012, -0.6949, -1.2062]}, {"m": "에/JKB", "idf": 1.0253, "w": [0.1089, -0.0851, -0.0238]}, {"m": "가/VV", "idf": 1.4918, "w": [-1.1185, 1.3392, -0.2207]}, {"m": "어서/EC", "idf": 1.335, "w": [-1.4894, 2.8742, -1.3848]}, {"m": "쌀/NNG", "idf": 5.1591, "w": [0.5805, -0.4877, -0.0928]}, {"m": "국수/NNG", "idf": 5.3684, "w": [0.5511, -0.092, -0.4591]}, {"m": "를/JKO", "idf": 1.1574, "w": [-0.3286, 0.131, 0.1976]}, {"m": "먹/VV", "idf": 1.8445, "w": [-0.8777, 1.4367, -0.559]}, {"m": "었/EP", "idf": 1.2951, "w": [0.6317, 0.7033, -1.3351]}, {"m": "습니다/EF", "idf": 1.9191, "w": [0.4879, -0.7498, 0.2619]}, {"m": "./SF", "idf": 1.0495, "w": [-0.3193, -1.0614, 1.3807]}]}, {"text": "저는 주말에 친구와 같이 도쿄에 가서 라멘을 먹었습니다.", "toks": [{"m": "저/NP", "idf": 1.5241, "w": [0.7993, -2.1818, 1.3825]}, {"m": "는/JX", "idf": 1.0544, "w": [0.4101, 1.4218, -1.8319]}, {"m": "주말/NNG", "idf": 3.1561, "w": [-0.2589, 0.0422, 0.2167]}, {"m": "에/JKB", "idf": 1.0253, "w": [0.1089, -0.0851, -0.0238]}, {"m": "친구/NNG", "idf": 1.6396, "w": [-1.1214, 0.0005, 1.1209]}, {"m": "와/JKB", "idf": 2.6486, "w": [-0.7686, 0.9322, -0.1636]}, {"m": "같이/MAG", "idf": 1.9478, "w": [0.788, -1.5375, 0.7495]}, {"m": "도쿄/NNP", "idf": 5.767, "w": [-0.3624, 0.8425, -0.4801]}, {"m": "에/JKB", "idf": 1.0253, "w": [0.1089, -0.0851, -0.0238]}, {"m": "가/VV", "idf": 1.4918, "w": [-1.1185, 1.3392, -0.2207]}, {"m": "어서/EC", "idf": 1.335, "w": [-1.4894, 2.8742, -1.3848]}, {"m": "라멘/NNG", "idf": 8.0494, "w": [-0.0304, 0.0643, -0.0339]}, {"m": "을/JKO", "idf": 1.0707, "w": [0.7581, -1.5062, 0.7481]}, {"m": "먹/VV", "idf": 1.8445, "w": [-0.8777, 1.4367, -0.559]}, {"m": "었/EP", "idf": 1.2951, "w": [0.6317, 0.7033, -1.3351]}, {"m": "습니다/EF", "idf": 1.9191, "w": [0.4879, -0.7498, 0.2619]}, {"m": "./SF", "idf": 1.0495, "w": [-0.3193, -1.0614, 1.3807]}]}, {"text": "시간이 없으니까 택시를 탔는데 길이 막혀서 늦었어요.", "toks": [{"m": "시간/NNG", "idf": 2.353, "w": [1.3215, -0.4124, -0.9091]}, {"m": "이/JKS", "idf": 1.1082, "w": [-1.0876, -0.493, 1.5805]}, {"m": "없/VA", "idf": 2.0168, "w": [-0.5923, 0.8715, -0.2792]}, {"m": "으니까/EC", "idf": 3.1207, "w": [-0.5312, 2.0588, -1.5275]}, {"m": "택시/NNG", "idf": 5.0241, "w": [0.0401, 0.0834, -0.1235]}, {"m": "를/JKO", "idf": 1.1574, "w": [-0.3286, 0.131, 0.1976]}, {"m": "타/VV", "idf": 3.0922, "w": [-0.2111, 0.0218, 0.1892]}, {"m": "었/EP", "idf": 1.2951, "w": [0.6317, 0.7033, -1.3351]}, {"m": "는데/EC", "idf": 2.5772, "w": [-0.5488, 0.4628, 0.0859]}, {"m": "길/NNG", "idf": 4.391, "w": [0.5576, -0.1267, -0.4309]}, {"m": "이/JKS", "idf": 1.1082, "w": [-1.0876, -0.493, 1.5805]}, {"m": "막히/VV", "idf": 5.9212, "w": [0.0505, -0.1104, 0.0599]}, {"m": "어서/EC", "idf": 1.335, "w": [-1.4894, 2.8742, -1.3848]}, {"m": "늦/VV", "idf": 7.0939, "w": [0.1063, -0.0843, -0.022]}, {"m": "었/EP", "idf": 1.2951, "w": [0.6317, 0.7033, -1.3351]}, {"m": "어요/EF", "idf": 2.0245, "w": [0.6615, -0.7042, 0.0427]}, {"m": "./SF", "idf": 1.0495, "w": [-0.3193, -1.0614, 1.3807]}]}, {"text": "저는 대만에서 왔어요. 한국 드라마를 좋아해요.", "toks": [{"m": "저/NP", "idf": 1.5241, "w": [0.7993, -2.1818, 1.3825]}, {"m": "는/JX", "idf": 1.0544, "w": [0.4101, 1.4218, -1.8319]}, {"m": "대만/NNP", "idf": 5.3822, "w": [-1.3822, -0.9096, 2.2918]}, {"m": "에서/JKB", "idf": 1.2691, "w": [-0.5753, 1.2311, -0.6558]}, {"m": "오/VV", "idf": 1.9139, "w": [0.0735, 0.554, -0.6275]}, {"m": "었/EP", "idf": 1.2951, "w": [0.6317, 0.7033, -1.3351]}, {"m": "어요/EF", "idf": 2.0245, "w": [0.6615, -0.7042, 0.0427]}, {"m": "./SF", "idf": 1.0495, "w": [-0.3193, -1.0614, 1.3807]}, {"m": "한국/NNP", "idf": 1.6522, "w": [-0.0083, -0.441, 0.4493]}, {"m": "드라마/NNG", "idf": 4.307, "w": [-0.1105, 0.2636, -0.1531]}, {"m": "를/JKO", "idf": 1.1574, "w": [-0.3286, 0.131, 0.1976]}, {"m": "좋아하/VV", "idf": 1.9819, "w": [-0.5219, -0.733, 1.2549]}, {"m": "어요/EF", "idf": 2.0245, "w": [0.6615, -0.7042, 0.0427]}, {"m": "./SF", "idf": 1.0495, "w": [-0.3193, -1.0614, 1.3807]}]}], "cm": [[388, 28, 64], [21, 413, 46], [42, 40, 398]], "ndocs": 5760, "small": [["저/NP", "는/JX", "한국/NNP", "음식/NNG", "을/JKO", "좋아하/VV", "ᆸ니다/EF", "./SF"], ["저/NP", "는/JX", "한국/NNP", "노래/NNG", "를/JKO", "좋아하/VV", "ᆸ니다/EF", "./SF"], ["친구/NNG", "는/JX", "일본/NNP", "음식/NNG", "을/JKO", "좋아하/VV", "ᆸ니다/EF", "./SF"]], "smallText": ["저는 한국 음식을 좋아합니다.", "저는 한국 노래를 좋아합니다.", "친구는 일본 음식을 좋아합니다."], "idfExamples": [["./SF", 1.0495], ["는/JX", 1.0544], ["친구/NNG", 1.6396], ["으니까/EC", 3.1207], ["하노이/NNP", 4.8147], ["라멘/NNG", 8.0494]]};
+const CL = D.classes;                       // ["베트남어","일본어","중국어"]
+const CC = ["vi", "ja", "zh"];
+const $ = s => document.querySelector(s);
+const reduce = matchMedia("(prefers-reduced-motion: reduce)").matches;
+const fmt = (x, d = 3) => x.toFixed(d);
+
+/* ---------- 1. DTM ---------- */
+const SMALL = D.small, STXT = D.smallText;
+const cols = [];
+SMALL.forEach(doc => doc.forEach(m => { if (!cols.includes(m)) cols.push(m); }));
+const order = []; SMALL.forEach((doc, i) => doc.forEach((m, j) => order.push([i, j, m])));
+let dtmPos = 0, dtmTimer = null, counts;
+function dtmInit() {
+  counts = SMALL.map(() => cols.map(() => 0));
+  $("#dtmSents").innerHTML = SMALL.map((doc, i) =>
+    `<div class="sent"><span class="lab">글 ${i + 1}</span>${doc.map((m, j) => `<span class="tok" id="t${i}_${j}">${m}</span>`).join("")}</div>`).join("");
+  $("#dtmTable").innerHTML = `<tr><th></th>${cols.map(c => `<th>${c}</th>`).join("")}</tr>` +
+    SMALL.map((_, i) => `<tr><th class="rowh">글 ${i + 1}</th>${cols.map((_, k) => `<td class="num zero" id="c${i}_${k}">0</td>`).join("")}</tr>`).join("");
+  dtmPos = 0; $("#dtmMsg").textContent = `${order.length}개 형태소, 열 ${cols.length}개`;
+}
+function dtmStep() {
+  document.querySelectorAll(".tok.now").forEach(e => { e.classList.remove("now"); e.classList.add("done"); });
+  document.querySelectorAll("td.flash").forEach(e => e.classList.remove("flash"));
+  if (dtmPos >= order.length) { stopDtm(); return false; }
+  const [i, j, m] = order[dtmPos++]; const k = cols.indexOf(m);
+  counts[i][k]++;
+  $(`#t${i}_${j}`).classList.add("now");
+  const td = $(`#c${i}_${k}`); td.textContent = counts[i][k]; td.classList.remove("zero"); td.classList.add("flash");
+  $("#dtmMsg").textContent = `글 ${i + 1}의 ‘${m}’ → ${m} 열에 1 더하기`;
+  if (dtmPos >= order.length) $("#dtmMsg").textContent = "완성: 글 3편 × 형태소 " + cols.length + "개";
+  return true;
+}
+function stopDtm() { clearInterval(dtmTimer); dtmTimer = null; $("#dtmPlay").textContent = "재생"; }
+$("#dtmPlay").onclick = () => {
+  if (dtmTimer) { stopDtm(); return; }
+  if (dtmPos >= order.length) dtmInit();
+  $("#dtmPlay").textContent = "멈춤";
+  dtmTimer = setInterval(() => { if (!dtmStep()) stopDtm(); }, reduce ? 150 : 650);
+};
+$("#dtmStep").onclick = () => { stopDtm(); dtmStep(); };
+$("#dtmReset").onclick = () => { stopDtm(); dtmInit(); };
+dtmInit();
+
+/* ---------- 1b. 단어 주머니의 한계 ---------- */
+const BAGS = [
+  { s: ["고양이가 개를 쫓았다.", "개가 고양이를 쫓았다."],
+    m: [["고양이/NNG", "가/JKS", "개/NNG", "를/JKO", "쫓/VV", "었/EP", "다/EF", "./SF"], ["개/NNG", "가/JKS", "고양이/NNG", "를/JKO", "쫓/VV", "었/EP", "다/EF", "./SF"]],
+    msg: "쫓은 쪽과 쫓긴 쪽이 바뀌었는데 숫자는 같습니다. ‘고양이가’와 ‘고양이를’이 ‘고양이/NNG + 가/JKS’, ‘고양이/NNG + 를/JKO’로 나뉘어 어느 낱말에 어느 조사가 붙었는지가 사라지기 때문입니다." },
+  { s: ["영화가 재미있었고 지루하지 않았다.", "영화가 지루했고 재미있지 않았다."],
+    m: [["영화/NNG", "가/JKS", "재미있/VA", "었/EP", "고/EC", "지루/XR", "하/XSA", "지/EC", "않/VX", "었/EP", "다/EF", "./SF"], ["영화/NNG", "가/JKS", "지루/XR", "하/XSA", "었/EP", "고/EC", "재미있/VA", "지/EC", "않/VX", "었/EP", "다/EF", "./SF"]],
+    msg: "칭찬과 혹평이 똑같은 숫자가 됩니다. ‘않다’가 무엇을 부정하는지는 순서에 있기 때문입니다. 감성 분석(다음 단원)에서 단어 주머니가 부딪히는 문제이고, 순서와 문맥을 보는 BERT가 나온 까닭이기도 합니다." }];
+let bagI = 0, bagged = false;
+function drawBag() {
+  const B = BAGS[bagI];
+  [0, 1].forEach(k => $("#bp" + k).setAttribute("aria-pressed", k === bagI));
+  if (!bagged) {
+    $("#bagSents").innerHTML = B.s.map((s, i) => `<div class="sent"><span class="lab">글 ${"AB"[i]}</span><span>${s}</span></div><div class="sent"><span class="lab"></span>${B.m[i].map(m => `<span class="tok">${m}</span>`).join("")}</div>`).join("");
+    $("#bagTable").innerHTML = ""; $("#bagMsg").textContent = "‘주머니에 넣기’를 누르면 순서를 버리고 개수만 셉니다.";
+    $("#bagBtn").textContent = "주머니에 넣기";
+    return;
+  }
+  const cols = [...new Set(B.m.flat())].sort();
+  $("#bagSents").innerHTML = B.s.map((s, i) => `<div class="sent"><span class="lab">글 ${"AB"[i]}</span><span>${s}</span></div><div class="sent"><span class="lab"></span>${[...B.m[i]].sort().map((m, j) => `<span class="tok flyin" style="animation-delay:${j * 50}ms">${m}</span>`).join("")}</div>`).join("");
+  const rows = B.m.map(doc => cols.map(c => doc.filter(m => m === c).length));
+  $("#bagTable").innerHTML = `<tr><th></th>${cols.map(c => `<th>${c}</th>`).join("")}</tr>` + rows.map((r, i) => `<tr><th class="rowh">글 ${"AB"[i]}</th>${r.map(v => `<td class="num flash">${v}</td>`).join("")}</tr>`).join("");
+  $("#bagMsg").textContent = "두 줄이 한 칸도 다르지 않습니다. " + B.msg;
+  $("#bagBtn").textContent = "다시 문장으로";
+}
+$("#bagBtn").onclick = () => { bagged = !bagged; drawBag(); };
+[0, 1].forEach(k => $("#bp" + k).onclick = () => { bagI = k; bagged = false; drawBag(); });
+drawBag();
+
+/* ---------- 2. IDF ---------- */
+const idf = (N, df) => Math.log((1 + N) / (1 + df)) + 1;
+const nIn = $("#nIn"), dfIn = $("#dfIn");
+nIn.max = 5760; nIn.value = 5760;
+function drawIdf() {
+  const N = +nIn.value; dfIn.max = N; if (+dfIn.value > N) dfIn.value = N;
+  const df = +dfIn.value, v = idf(N, df);
+  $("#nOut").textContent = N.toLocaleString(); $("#dfOut").textContent = df.toLocaleString();
+  $("#idfOut").textContent = fmt(v);
+  const share = df / N;
+  $("#idfMsg").textContent = df === N ? "모든 글에 나옴: IDF가 가장 작은 값 1이 되어 TF를 그대로 둠" :
+    share < 0.01 ? `${(share * 100).toFixed(2)}%의 글에만 나옴: 드문 형태소라 크게 키움` :
+    `${(share * 100).toFixed(1)}%의 글에 나옴`;
+  const W = 360, H = 220, L = 40, R = 12, T = 12, B = 34;
+  const maxY = idf(N, 1), x = d => L + (W - L - R) * Math.log(d) / Math.log(N), y = val => T + (H - T - B) * (1 - (val - 1) / (maxY - 1 || 1));
+  let path = ""; for (let i = 0; i <= 80; i++) { const d = Math.exp(Math.log(N) * i / 80); path += (i ? "L" : "M") + x(d).toFixed(1) + "," + y(idf(N, d)).toFixed(1); }
+  const ticks = [1, 10, 100, 1000].filter(t => t <= N);
+  $("#idfSvg").innerHTML = `
+    <line class="axis" x1="${L}" y1="${H - B}" x2="${W - R}" y2="${H - B}"/><line class="axis" x1="${L}" y1="${T}" x2="${L}" y2="${H - B}"/>
+    ${ticks.map(t => `<text x="${x(t)}" y="${H - B + 15}" text-anchor="middle">${t}</text>`).join("")}
+    <text x="${W - R}" y="${H - B + 15}" text-anchor="end">${N}</text>
+    <text x="${(L + W) / 2}" y="${H - 4}" text-anchor="middle">DF (로그 눈금)</text>
+    <text x="${L - 6}" y="${y(1) + 4}" text-anchor="end">1</text>
+    <text x="${L - 6}" y="${y(maxY) + 4}" text-anchor="end">${maxY.toFixed(1)}</text>
+    <path class="curve" d="${path}"/>
+    <circle class="dot" r="6" cx="${x(df)}" cy="${y(v)}"/>`;
+}
+nIn.oninput = drawIdf; dfIn.oninput = drawIdf; drawIdf();
+$("#idfExamples").textContent = D.idfExamples.map(([m, v]) => `${m} ${v.toFixed(2)}`).join(", ");
+
+// 세 문장 TF → TF-IDF → L2
+const N3 = 3, df3 = cols.map((_, k) => SMALL.filter(doc => doc.includes(cols[k])).length);
+const tf3 = SMALL.map(doc => cols.map(c => doc.filter(m => m === c).length));
+const ti3 = tf3.map(r => r.map((v, k) => v * idf(N3, df3[k])));
+const l23 = ti3.map(r => { const n = Math.hypot(...r); return r.map(v => v / n); });
+let tfStage = 0;
+function drawTf() {
+  const M = [tf3, ti3, l23][tfStage], d = tfStage ? (tfStage === 2 ? 2 : 2) : 0;
+  const mx = Math.max(...M.flat());
+  $("#tfTable").innerHTML = `<tr><th></th>${cols.map(c => `<th>${c}</th>`).join("")}</tr>
+    <tr><th class="rowh">DF</th>${df3.map(v => `<td class="num">${v}</td>`).join("")}</tr>
+    <tr><th class="rowh">IDF</th>${df3.map(v => `<td class="num">${idf(N3, v).toFixed(3)}</td>`).join("")}</tr>` +
+    M.map((r, i) => `<tr><th class="rowh">글 ${i + 1}</th>${r.map(v => `<td class="num${v === 0 ? " zero" : ""}" style="background:${v ? `color-mix(in srgb, var(--hi) ${Math.round(55 * v / mx)}%, transparent)` : "transparent"}">${v === 0 ? 0 : v.toFixed(d)}</td>`).join("")}</tr>`).join("");
+  $("#tfMsg").textContent = [
+    "개수만 세면 세 글 모두에 나오는 ‘좋아하/VV’, ‘ᆸ니다/EF’도 다른 형태소와 같은 값입니다.",
+    "IDF를 곱하면 한 글에만 나온 ‘노래/NNG’, ‘친구/NNG’, ‘일본/NNP’가 가장 커지고, 세 글 모두에 나온 형태소는 1배로 그대로입니다.",
+    "글마다 값의 제곱합이 1이 되도록 나눕니다. 긴 글이라고 값이 커지지 않게 하려는 것이고, 어휘 계량에서 상대빈도를 쓴 것과 같은 까닭입니다."][tfStage];
+  ["#tfA", "#tfB", "#tfC"].forEach((s, i) => $(s).setAttribute("aria-pressed", i === tfStage));
+}
+["#tfA", "#tfB", "#tfC"].forEach((s, i) => $(s).onclick = () => { tfStage = i; drawTf(); });
+drawTf();
+
+/* ---------- 3. 분류기 ---------- */
+const sel = $("#sentSel");
+D.sents.forEach((s, i) => sel.insertAdjacentHTML("beforeend", `<option value="${i}">${s.text}</option>`));
+let off = new Set();
+function compute(sent) {
+  // TF: 같은 형태소 합치기 → × IDF → L2 (보이는 형태소만)
+  const agg = new Map();
+  sent.toks.forEach((t, i) => { if (t.idf === null || off.has(t.m)) return; const a = agg.get(t.m) || { t, tf: 0 }; a.tf++; agg.set(t.m, a); });
+  const items = [...agg.values()].map(a => ({ m: a.t.m, w: a.t.w, v: a.tf * a.t.idf }));
+  const norm = Math.hypot(...items.map(a => a.v)) || 1;
+  items.forEach(a => { a.x = a.v / norm; a.c = a.w.map(w => w * a.x); });
+  const z = CL.map((_, k) => D.intercept[k] + items.reduce((s, a) => s + a.c[k], 0));
+  const mz = Math.max(...z), e = z.map(v => Math.exp(v - mz)), se = e.reduce((a, b) => a + b, 0);
+  return { items, z, p: e.map(v => v / se) };
+}
+function drawCls() {
+  const sent = D.sents[+sel.value], r = compute(sent);
+  const contribOf = m => { const it = r.items.find(a => a.m === m); return it; };
+  const seen = new Set();
+  $("#chips").innerHTML = sent.toks.map(t => {
+    if (t.idf === null) return `<span class="chip unk" title="특성에 없음">${t.m}</span>`;
+    const it = contribOf(t.m), isOff = off.has(t.m);
+    let cls = "", lab = "";
+    if (it) { const k = it.c.indexOf(Math.max(...it.c)); cls = "c" + k; lab = (it.c[k] >= 0 ? "+" : "") + it.c[k].toFixed(2); }
+    const first = !seen.has(t.m); seen.add(t.m);
+    return `<button class="chip ${isOff ? "off" : cls}" data-m="${t.m}" aria-pressed="${isOff}">${t.m}${first && it ? `<small>${lab}</small>` : ""}</button>`;
+  }).join("");
+  document.querySelectorAll("#chips button.chip").forEach(b => b.onclick = () => { const m = b.dataset.m; off.has(m) ? off.delete(m) : off.add(m); drawCls(); });
+  // 점수 막대: 가운데 0, 범위 ±R
+  const span = Math.max(2, ...CL.map((_, k) => Math.max(r.items.reduce((s, a) => s + Math.max(0, a.c[k]), 0) + Math.max(0, D.intercept[k]), r.items.reduce((s, a) => s + Math.max(0, -a.c[k]), 0) + Math.max(0, -D.intercept[k]))));
+  const sc = v => 50 * v / span;
+  $("#zRows").innerHTML = CL.map((name, k) => {
+    let pos = 0, neg = 0, segs = "";
+    const parts = [...r.items.map(a => ({ m: a.m, v: a.c[k] })), { m: "b (절편)", v: D.intercept[k] }].sort((a, b) => Math.abs(b.v) - Math.abs(a.v));
+    const topM = parts.filter(p => p.m !== "b (절편)")[0]?.m;
+    parts.forEach(p => {
+      if (p.v >= 0) { segs += `<div class="seg pos${p.m === topM ? " top" : ""}" title="${p.m} ${p.v.toFixed(3)}" style="left:${50 + sc(pos)}%;width:${sc(p.v)}%"></div>`; pos += p.v; }
+      else { neg += -p.v; segs += `<div class="seg neg${p.m === topM ? " top" : ""}" title="${p.m} ${p.v.toFixed(3)}" style="left:${50 - sc(neg)}%;width:${sc(-p.v)}%"></div>`; }
+    });
+    return `<div class="zrow"><span>${name}</span><div class="zaxis"><div class="mid"></div>${segs}</div><span class="zval">${r.z[k].toFixed(2)}</span></div>`;
+  }).join("");
+  $("#pBars").innerHTML = CL.map((name, k) => `<div class="bar ${CC[k]}"><span>${name}</span><div class="track"><div class="fill" style="width:0"></div></div><span class="val">${r.p[k].toFixed(3)}</span></div>`).join("");
+  requestAnimationFrame(() => document.querySelectorAll("#pBars .fill").forEach((f, k) => f.style.width = (r.p[k] * 100) + "%"));
+  const k = r.p.indexOf(Math.max(...r.p));
+  const top = r.items.map(a => [a.m, a.c[k]]).sort((a, b) => b[1] - a[1]).slice(0, 2).filter(a => a[1] > 0);
+  $("#verdict").innerHTML = `→ <b>${CL[k]}</b> <span class="note">(가장 큰 근거: ${top.map(a => "‘" + a[0] + "’").join(", ") || "없음"})</span>`;
+}
+sel.onchange = () => { off = new Set(); drawCls(); };
+$("#restore").onclick = () => { off = new Set(); drawCls(); };
+drawCls();
+
+/* ---------- 4. 혼동 행렬 ---------- */
+const CM = D.cm; let cmK = 1;
+CL.forEach((name, k) => $("#cmBtns").insertAdjacentHTML("beforeend", `<button data-k="${k}">${name}</button>`));
+document.querySelectorAll("#cmBtns button").forEach(b => b.onclick = () => { cmK = +b.dataset.k; drawCm(); });
+function drawCm() {
+  document.querySelectorAll("#cmBtns button").forEach(b => b.setAttribute("aria-pressed", +b.dataset.k === cmK));
+  $("#cmTable").innerHTML = `<tr><th></th>${CL.map(c => `<th>예측 ${c}</th>`).join("")}<th>합계</th></tr>` +
+    CM.map((r, i) => `<tr><th class="rowh">정답 ${CL[i]}</th>${r.map((v, j) => `<td class="cell${i === j ? " diag" : ""}${i === cmK ? " inrow" : ""}${j === cmK ? " incol" : ""}">${v}</td>`).join("")}<td class="num">${r.reduce((a, b) => a + b, 0)}</td></tr>`).join("") +
+    `<tr><th class="rowh">합계</th>${CL.map((_, j) => `<td class="num">${CM.reduce((s, r) => s + r[j], 0)}</td>`).join("")}<td class="num">${CM.flat().reduce((a, b) => a + b, 0)}</td></tr>`;
+  const tp = CM[cmK][cmK], col = CM.reduce((s, r) => s + r[cmK], 0), row = CM[cmK].reduce((a, b) => a + b, 0);
+  const P = tp / col, R = tp / row, F = 2 * P * R / (P + R), acc = CM.reduce((s, r, i) => s + r[i], 0) / CM.flat().reduce((a, b) => a + b, 0);
+  $("#cmStats").innerHTML = `
+    <div class="stat"><span class="k">정밀도 (주황 열)</span><span class="v">${fmt(P)}</span><span class="f">${tp} ÷ ${col}</span></div>
+    <div class="stat"><span class="k">재현율 (파란 행)</span><span class="v">${fmt(R)}</span><span class="f">${tp} ÷ ${row}</span></div>
+    <div class="stat"><span class="k">F1</span><span class="v">${fmt(F)}</span><span class="f">2PR ÷ (P + R)</span></div>
+    <div class="stat"><span class="k">정확도 (전체)</span><span class="v">${fmt(acc)}</span><span class="f">대각선 합 ÷ 전체</span></div>`;
+}
+drawCm();
+</script>
+</body></html>

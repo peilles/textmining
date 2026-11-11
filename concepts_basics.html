@@ -1,0 +1,459 @@
+<!doctype html>
+<html lang="ko"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>문서 분류의 기초 개념</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Gowun+Batang:wght@700&family=IBM+Plex+Sans+KR:wght@400;500;600&family=IBM+Plex+Mono:wght@500&display=swap">
+<style>
+/* 강의 화면용 설명 페이지 (TF-IDF·BERT 자료와 같은 틀): 개념마다 [쉬운 비유 → 직접 움직여 보기 → 문서 분류에서는] */
+:root {
+  --bg: #f5f7f8; --panel: #ffffff; --ink: #17222b; --muted: #5d6b76; --line: #d6dde2; --soft: #eef2f4;
+  --a: #0f7b6c; --a-soft: #d7efe9;     /* 글 A, 정답 */
+  --b: #3c5fa8; --b-soft: #dde5f5;     /* 글 B */
+  --c: #b4452f; --c-soft: #f6ded8;     /* 셋째 */
+  --hi: #c47a12; --hi-soft: #fbecd2;   /* 강조 */
+  --f-display: "Gowun Batang", "Nanum Myeongjo", serif;
+  --f-body: "IBM Plex Sans KR", "Apple SD Gothic Neo", "Malgun Gothic", sans-serif;
+  --f-num: "IBM Plex Mono", ui-monospace, monospace;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --bg: #12181d; --panel: #1a2229; --ink: #e6ecef; --muted: #9aa8b2; --line: #2e3a43; --soft: #222c34;
+    --a: #4fc3ad; --a-soft: #173a35; --b: #8aa7e8; --b-soft: #1f2a42; --c: #ef8a72; --c-soft: #3d2420;
+    --hi: #f0a742; --hi-soft: #3b2c14; color-scheme: dark;
+  }
+}
+:root[data-theme="dark"] {
+  --bg: #12181d; --panel: #1a2229; --ink: #e6ecef; --muted: #9aa8b2; --line: #2e3a43; --soft: #222c34;
+  --a: #4fc3ad; --a-soft: #173a35; --b: #8aa7e8; --b-soft: #1f2a42; --c: #ef8a72; --c-soft: #3d2420;
+  --hi: #f0a742; --hi-soft: #3b2c14; color-scheme: dark;
+}
+* { box-sizing: border-box; }
+body {
+  margin: 0; background: var(--bg); color: var(--ink); font-family: var(--f-body); font-size: 16px; line-height: 1.65;
+  padding-left: max(16px, env(safe-area-inset-left, 0px)); padding-right: max(16px, env(safe-area-inset-right, 0px));
+  padding-block: 32px 56px;
+}
+main { max-width: 880px; margin: 0 auto; display: grid; gap: 28px; }
+header { display: grid; gap: 8px; }
+h1 { font-family: var(--f-display); font-size: clamp(30px, 6vw, 42px); line-height: 1.2; margin: 0; text-wrap: balance; }
+h2 { font-family: var(--f-display); font-size: 24px; line-height: 1.3; margin: 0; text-wrap: balance; }
+p { margin: 0; max-width: 68ch; }
+a { color: var(--b); }
+.lead { color: var(--muted); }
+nav.toc { display: flex; flex-wrap: wrap; gap: 6px; font-size: 14px; }
+nav.toc a { text-decoration: none; border: 1px solid var(--line); border-radius: 14px; padding: 2px 10px; color: var(--ink); background: var(--panel); }
+nav.toc a:hover { border-color: var(--muted); }
+section.panel { background: var(--panel); border: 1px solid var(--line); border-radius: 10px; padding: 22px clamp(16px, 3vw, 28px); display: grid; gap: 14px; min-width: 0; }
+.eyebrow { font-size: 13px; letter-spacing: .06em; color: var(--muted); font-weight: 600; }
+.note { font-size: 14px; color: var(--muted); }
+.easy { border-left: 3px solid var(--hi); padding: 4px 0 4px 12px; }
+.inclass { background: var(--soft); border-radius: 6px; padding: 10px 14px; font-size: 15px; }
+.inclass b { color: var(--hi); }
+.formula { font-family: var(--f-num); font-size: 15px; background: var(--soft); border-radius: 6px; padding: 8px 14px; overflow-x: auto; white-space: nowrap; }
+.controls { display: flex; flex-wrap: wrap; gap: 8px 16px; align-items: center; }
+button {
+  font: 500 14px var(--f-body); color: var(--ink); background: var(--bg); border: 1px solid var(--line);
+  border-radius: 6px; padding: 7px 14px; cursor: pointer;
+}
+button:hover { border-color: var(--muted); }
+button.primary { background: var(--ink); color: var(--panel); border-color: var(--ink); }
+button[aria-pressed="true"] { background: var(--hi-soft); border-color: var(--hi); }
+button:focus-visible, input:focus-visible { outline: 2px solid var(--hi); outline-offset: 2px; }
+label.slider { display: inline-flex; gap: 8px; align-items: center; font-size: 14px; color: var(--muted); flex-wrap: wrap; }
+label.slider output { font-family: var(--f-num); color: var(--ink); min-width: 3ch; }
+.two { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 20px; align-items: start; }
+@media (max-width: 680px) { .two { grid-template-columns: minmax(0, 1fr); } }
+.stack { display: grid; gap: 10px; align-content: start; min-width: 0; }
+svg text { fill: var(--muted); font-family: var(--f-body); font-size: 12px; }
+svg .ax { stroke: var(--line); }
+svg .grid { stroke: var(--line); stroke-dasharray: 2 3; }
+svg .va { stroke: var(--a); stroke-width: 3; } svg .vb { stroke: var(--b); stroke-width: 3; }
+svg .ha { fill: var(--a); } svg .hb { fill: var(--b); }
+svg .unit { fill: none; stroke: var(--muted); stroke-dasharray: 3 3; }
+svg .arcl { fill: none; stroke: var(--hi); stroke-width: 2; }
+svg .curve { fill: none; stroke: var(--hi); stroke-width: 2.5; }
+svg .dot { fill: var(--hi); stroke: var(--panel); stroke-width: 2; }
+svg .p0 { fill: var(--b); } svg .p1 { fill: var(--c); }
+.readout { display: grid; grid-template-columns: repeat(auto-fit, minmax(130px, 1fr)); gap: 8px; }
+.stat { border: 1px solid var(--line); border-radius: 8px; padding: 8px 12px; display: grid; gap: 0; }
+.stat .k { font-size: 13px; color: var(--muted); }
+.stat .v { font-family: var(--f-num); font-size: 20px; }
+.bars { display: grid; gap: 6px; }
+.bar { display: grid; grid-template-columns: 5.5em minmax(0, 1fr) 4.2em; gap: 8px; align-items: center; font-size: 14px; }
+.bar .track { height: 18px; background: var(--soft); border-radius: 4px; overflow: hidden; }
+.bar .fill { height: 100%; background: var(--hi); border-radius: 4px; transition: width .45s ease; }
+.bar .val { font-family: var(--f-num); font-size: 13px; text-align: right; }
+.bar.a .fill { background: var(--a); } .bar.b .fill { background: var(--b); } .bar.c .fill { background: var(--c); }
+table { border-collapse: collapse; font-size: 14px; font-variant-numeric: tabular-nums; }
+th, td { border-bottom: 1px solid var(--line); padding: 5px 10px; text-align: center; }
+th { color: var(--muted); font-weight: 600; font-size: 13px; }
+td.num { font-family: var(--f-num); }
+input[type=number] { width: 4.5em; font: 500 14px var(--f-num); color: var(--ink); background: var(--bg); border: 1px solid var(--line); border-radius: 5px; padding: 3px 6px; }
+.scroll { overflow-x: auto; }
+canvas { width: 100%; max-width: 100%; height: auto; background: var(--soft); border-radius: 8px; display: block; }
+.dots { display: grid; grid-template-columns: repeat(30, 1fr); gap: 3px; max-width: 420px; }
+.dots i { aspect-ratio: 1; border-radius: 50%; background: var(--a); transition: background .4s, transform .4s; }
+.dots i.t { background: var(--hi); transform: scale(.8); }
+@media (prefers-reduced-motion: reduce) { * { transition: none !important; } }
+</style>
+</head><body>
+<main>
+<header>
+  <div class="eyebrow">한국어 텍스트 마이닝 · 문서 분류</div>
+  <h1>문서 분류의 기초 개념</h1>
+  <p class="lead">문서 분류와 BERT에서 처음 나오는 수학 개념을 계산 없이 감으로 익히는 자료입니다. 개념마다 쉬운 비유를 먼저 보고, 직접 움직여 본 뒤, 수업 자료의 어디에 쓰이는지 확인합니다.</p>
+  <nav class="toc" aria-label="차례">
+    <a href="#vec">벡터</a><a href="#len">길이와 방향</a><a href="#log">로그</a><a href="#wsum">가중합</a><a href="#soft">softmax</a><a href="#learn">학습</a><a href="#split">훈련과 시험</a><a href="#pca">차원 줄이기</a>
+  </nav>
+  <p class="note">함께 보는 자료: <a href="tfidf_classifier.html">TF-IDF와 분류기</a> · <a href="bert_explainer.html">BERT는 글을 어떻게 읽나</a></p>
+</header>
+
+<!-- 1 벡터 -->
+<section class="panel" id="vec" aria-labelledby="h1v">
+  <div class="eyebrow">1 · 벡터</div>
+  <h2 id="h1v">글 한 편은 숫자 한 줄이 된다</h2>
+  <p class="easy">벡터는 <b>순서가 정해진 숫자의 줄</b>입니다. 성적표에서 한 학생의 (국어, 영어, 수학) 점수가 한 줄인 것처럼, 글 한 편의 (‘음식’ 개수, ‘노래’ 개수)도 한 줄입니다. 숫자가 두 개면 평면 위의 화살표로 그릴 수 있습니다.</p>
+  <div class="two">
+    <div class="stack">
+      <div class="controls">
+        <label class="slider" for="ax">글 A ‘음식’ <input id="ax" type="range" min="0" max="5" value="3"><output id="axo"></output></label>
+        <label class="slider" for="ay">‘노래’ <input id="ay" type="range" min="0" max="5" value="1"><output id="ayo"></output></label>
+      </div>
+      <div class="controls">
+        <label class="slider" for="bx">글 B ‘음식’ <input id="bx" type="range" min="0" max="5" value="1"><output id="bxo"></output></label>
+        <label class="slider" for="by">‘노래’ <input id="by" type="range" min="0" max="5" value="4"><output id="byo"></output></label>
+      </div>
+      <p id="vecMsg"></p>
+    </div>
+    <svg id="vecSvg" viewBox="0 0 300 300" role="img" aria-label="두 글의 벡터"></svg>
+  </div>
+  <p class="inclass"><b>수업에서는</b> 형태소가 7,316개이므로 글 한 편이 숫자 7,316개의 줄(7,316차원 벡터)입니다. 화살표로 그릴 수는 없지만 계산하는 방법은 두 개일 때와 같습니다. BERT는 토큰 하나를 숫자 768개의 벡터로 나타냅니다.</p>
+</section>
+
+<!-- 2 길이와 방향 -->
+<section class="panel" id="len" aria-labelledby="h2v">
+  <div class="eyebrow">2 · 길이와 방향</div>
+  <h2 id="h2v">긴 글과 짧은 글을 공평하게 비교하기</h2>
+  <p class="easy">같은 내용을 두 번 이어 쓰면 개수가 모두 2배가 됩니다. 화살표는 <b>방향은 그대로이고 길이만 2배</b>가 됩니다. 글의 성격은 방향에 있고, 길이는 글의 길이일 뿐입니다. 그래서 모든 화살표의 길이를 1로 맞추고(점선 원 위로) 방향만 비교합니다.</p>
+  <div class="two">
+    <div class="stack">
+      <div class="controls">
+        <label class="slider" for="rep">글 A를 <input id="rep" type="range" min="1" max="4" value="1"><output id="repo"></output>번 이어 쓰기</label>
+        <button id="normBtn" aria-pressed="false">길이를 1로 맞추기</button>
+      </div>
+      <div class="readout">
+        <div class="stat"><span class="k">A의 길이</span><span class="v" id="lenA"></span></div>
+        <div class="stat"><span class="k">B의 길이</span><span class="v" id="lenB"></span></div>
+        <div class="stat"><span class="k">사이각</span><span class="v" id="ang"></span></div>
+        <div class="stat"><span class="k">코사인 유사도</span><span class="v" id="cos"></span></div>
+      </div>
+      <p class="note">길이 = √(가로² + 세로²). 피타고라스의 정리와 같습니다. 코사인 유사도는 두 화살표가 같은 방향이면 1, 직각이면 0입니다. 글 A를 여러 번 이어 써도 코사인 유사도는 변하지 않습니다.</p>
+    </div>
+    <svg id="lenSvg" viewBox="0 0 300 300" role="img" aria-label="길이와 방향"></svg>
+  </div>
+  <p class="inclass"><b>수업에서는</b> TF-IDF의 마지막 단계 ‘길이 맞추기(L2)’가 이것입니다. BERT 자료에서 ‘배’의 벡터가 비슷한지 잴 때 쓴 것이 코사인 유사도입니다.</p>
+</section>
+
+<!-- 3 로그 -->
+<section class="panel" id="log" aria-labelledby="h3v">
+  <div class="eyebrow">3 · 로그</div>
+  <h2 id="h3v">몇 배인지를 몇 걸음인지로 바꾸기</h2>
+  <p class="easy">로그는 <b>‘몇 번 곱했나’</b>를 셉니다. 1에서 시작해 10배, 또 10배 하면 100이 되므로 log₁₀ 100 = 2입니다. 그래서 1과 2의 차이(2배)는 크게 보고, 1,000과 1,001의 차이는 거의 없는 것으로 봅니다. 사람이 소리 크기나 별의 밝기를 느끼는 방식과 비슷합니다.</p>
+  <div class="two">
+    <div class="stack">
+      <label class="slider" for="lx">x <input id="lx" type="range" min="0" max="300" value="100"><output id="lxo"></output></label>
+      <div class="readout">
+        <div class="stat"><span class="k">ln x (자연로그)</span><span class="v" id="lnx"></span></div>
+        <div class="stat"><span class="k">x를 2배로 하면</span><span class="v" id="lnx2"></span></div>
+      </div>
+      <p class="note">ln은 2.718…(e)을 몇 번 곱했나를 세는 로그입니다. 어느 로그든 x가 2배가 될 때마다 늘어나는 양은 일정합니다(ln에서는 0.693).</p>
+    </div>
+    <svg id="logSvg" viewBox="0 0 320 220" role="img" aria-label="로그 곡선"></svg>
+  </div>
+  <p class="inclass"><b>수업에서는</b> IDF = ln((1 + N) ÷ (1 + DF)) + 1. 형태소가 나온 글 수가 1편이냐 2편이냐는 큰 차이지만 1,000편이냐 1,001편이냐는 차이가 없도록 로그를 씁니다. 어휘 계량의 지프 법칙 그래프, 공기어 분석의 MI에서도 로그를 썼습니다.</p>
+</section>
+
+<!-- 4 가중합 -->
+<section class="panel" id="wsum" aria-labelledby="h4v">
+  <div class="eyebrow">4 · 가중치와 가중합</div>
+  <h2 id="h4v">항목마다 중요도를 곱해 더하기</h2>
+  <p class="easy">성적을 낼 때 중간고사 30%, 기말고사 40%, 과제 30%처럼 항목마다 비중을 두고 <b>점수 × 비중</b>을 더합니다. 이 비중이 <b>가중치</b>이고, 곱해서 더한 값이 <b>가중합</b>입니다. 가중치가 음수이면 그 항목이 많을수록 점수가 내려갑니다.</p>
+  <div class="scroll"><table id="wTable"></table></div>
+  <div class="readout">
+    <div class="stat"><span class="k">일본어 점수 z</span><span class="v" id="wz"></span></div>
+  </div>
+  <p class="note">값과 가중치를 바꿔 보세요. 가중치는 수업의 분류기가 실제로 배운 일본어 쪽 가중치입니다(값은 예시).</p>
+  <p class="inclass"><b>수업에서는</b> 로지스틱 회귀가 부류마다 형태소 7,316개에 가중치를 하나씩 둡니다. 글의 TF-IDF 값 × 가중치를 모두 더한 것이 그 부류의 점수입니다. ‘학습’은 이 가중치를 정하는 일입니다.</p>
+</section>
+
+<!-- 5 softmax -->
+<section class="panel" id="soft" aria-labelledby="h5v">
+  <div class="eyebrow">5 · 지수와 softmax</div>
+  <h2 id="h5v">점수를 확률로 바꾸기</h2>
+  <p class="easy">점수는 음수도 될 수 있고 합이 1도 아니어서 확률로 읽을 수 없습니다. softmax는 두 단계로 점수를 확률로 바꿉니다. ① 점수마다 e<sup>점수</sup>를 계산해 모두 양수로 만든다(점수가 1 오를 때마다 약 2.7배). ② 그 값들을 합으로 나눠 합을 1로 만든다.</p>
+  <div class="two">
+    <div class="stack">
+      <label class="slider" for="z0">베트남어 점수 <input id="z0" type="range" min="-3" max="3" step="0.1" value="1"><output id="z0o"></output></label>
+      <label class="slider" for="z1">일본어 점수 <input id="z1" type="range" min="-3" max="3" step="0.1" value="2.5"><output id="z1o"></output></label>
+      <label class="slider" for="z2">중국어 점수 <input id="z2" type="range" min="-3" max="3" step="0.1" value="0.2"><output id="z2o"></output></label>
+      <div class="controls"><button id="shift">세 점수에 모두 1 더하기</button><button id="spread">점수 차이 2배로</button></div>
+    </div>
+    <div class="stack">
+      <div class="eyebrow">① e^점수</div><div class="bars" id="expBars"></div>
+      <div class="eyebrow">② 합으로 나누기 = 확률</div><div class="bars" id="probBars"></div>
+    </div>
+  </div>
+  <p class="note" id="softMsg">세 점수에 같은 수를 더해도 확률은 그대로입니다. 점수의 차이만 중요합니다. 차이가 커지면 가장 큰 쪽의 확률이 1에 가까워집니다.</p>
+  <p class="inclass"><b>수업에서는</b> 분류기가 내놓는 ‘확률’(predict_proba)이 이렇게 계산됩니다. BERT의 마지막 단계도 같습니다.</p>
+</section>
+
+<!-- 6 학습 -->
+<section class="panel" id="learn" aria-labelledby="h6v">
+  <div class="eyebrow">6 · 학습</div>
+  <h2 id="h6v">틀린 만큼 가중치를 조금씩 고치기</h2>
+  <p class="easy">눈을 가리고 골짜기 바닥을 찾는다면 발밑이 내려가는 쪽으로 한 걸음씩 옮기면 됩니다. 학습도 같습니다. 가중치를 조금 바꿨을 때 <b>틀린 정도(손실)</b>가 줄어드는 쪽으로 한 걸음씩 옮기고, 이것을 수없이 되풀이합니다.</p>
+  <p class="note">예시: 글 10편에서 ‘-으니까’의 값(가로)만 보고 일본어 학습자의 글인지(위 줄) 아닌지(아래 줄) 판단하는 분류기. 주황 곡선이 분류기가 계산한 ‘일본어일 확률’입니다.</p>
+  <div class="two">
+    <svg id="fitSvg" viewBox="0 0 320 220" role="img" aria-label="분류기 곡선과 자료"></svg>
+    <svg id="lossSvg" viewBox="0 0 320 220" role="img" aria-label="손실의 변화"></svg>
+  </div>
+  <div class="controls">
+    <button class="primary" id="trainPlay">학습 재생</button>
+    <button id="trainStep">한 걸음</button>
+    <button id="trainReset">처음부터</button>
+    <label class="slider" for="lr">걸음 크기 <input id="lr" type="range" min="0.05" max="3" step="0.05" value="0.5"><output id="lro"></output></label>
+  </div>
+  <div class="readout">
+    <div class="stat"><span class="k">걸음 수</span><span class="v" id="ep"></span></div>
+    <div class="stat"><span class="k">가중치 w</span><span class="v" id="ww"></span></div>
+    <div class="stat"><span class="k">손실</span><span class="v" id="ll"></span></div>
+    <div class="stat"><span class="k">맞힌 글</span><span class="v" id="acc"></span></div>
+  </div>
+  <p class="note">가운데쯤의 두 글은 값이 겹쳐서 이 분류기로는 끝까지 맞힐 수 없습니다. 그래서 손실이 0까지 내려가지 않습니다. 걸음 크기를 너무 크게 하면 바닥을 지나쳐 손실이 들쭉날쭉해집니다. 너무 작으면 바닥까지 오래 걸립니다.</p>
+  <p class="inclass"><b>수업에서는</b> model.fit() 한 줄이 이 일을 합니다. 가중치가 하나가 아니라 7,316 × 3개이고, 글이 5,760편일 뿐입니다. BERT의 사전 학습과 미세 조정도 같은 방식으로, 가중치 1억 개 정도를 고칩니다.</p>
+</section>
+
+<!-- 7 훈련과 시험 -->
+<section class="panel" id="split" aria-labelledby="h7v">
+  <div class="eyebrow">7 · 훈련과 시험, 과적합</div>
+  <h2 id="h7v">기출문제만 외운 학생은 새 문제를 못 푼다</h2>
+  <p class="easy">기출문제의 답을 외우면 기출문제는 다 맞지만 새 문제는 틀립니다. 그래서 분류기를 평가할 때는 <b>학습에 쓰지 않은 글</b>로 시험합니다. 훈련 데이터에만 지나치게 맞춰져 새 글을 못 맞히는 것을 <b>과적합</b>이라고 합니다.</p>
+  <div class="two">
+    <div class="stack">
+      <div class="dots" id="dots" aria-label="글 7,200편을 점 300개로 나타냄"></div>
+      <div class="controls"><button class="primary" id="splitBtn">무작위로 20% 떼어 두기</button></div>
+      <p class="note">점 하나가 글 24편입니다. 주황 점(시험 데이터)은 학습이 끝날 때까지 분류기에게 보여 주지 않습니다.</p>
+    </div>
+    <div class="stack">
+      <div class="eyebrow">수업 분류기의 정확도</div>
+      <div class="bars" id="accBars"></div>
+      <p class="note">본 글(훈련)을 가장 잘 맞히고, 처음 보는 글(시험)은 그보다 덜, 주제가 다른 4급 글은 더 덜 맞힙니다. 진짜 실력은 시험 데이터와 4급 글의 정확도입니다.</p>
+    </div>
+  </div>
+</section>
+
+<!-- 8 차원 줄이기 -->
+<section class="panel" id="pca" aria-labelledby="h8v">
+  <div class="eyebrow">8 · 차원 줄이기</div>
+  <h2 id="h8v">그림자가 가장 넓게 퍼지는 방향에서 보기</h2>
+  <p class="easy">입체 물체에 빛을 비추면 벽에 2차원 그림자가 생깁니다. 비추는 방향에 따라 그림자는 넓게 퍼지기도 하고 한데 뭉치기도 합니다. <b>주성분 분석(PCA)</b>은 점들의 그림자가 가장 넓게 퍼지는 방향을 찾아, 많은 차원의 점을 2차원으로 줄여 그립니다.</p>
+  <div class="two">
+    <div class="stack">
+      <div class="eyebrow">3차원 점 (돌려 보기)</div>
+      <canvas id="c3d" width="520" height="400" aria-label="3차원 점 구름"></canvas>
+      <label class="slider" for="rot">보는 방향 <input id="rot" type="range" min="0" max="180" value="20"><output id="roto"></output></label>
+    </div>
+    <div class="stack">
+      <div class="eyebrow">벽에 비친 2차원 그림자</div>
+      <canvas id="c2d" width="520" height="400" aria-label="2차원 그림자"></canvas>
+      <div class="controls"><button class="primary" id="bestBtn">가장 넓게 퍼지는 방향 찾기</button><span class="note">퍼진 정도 <b id="spreadV"></b></span></div>
+    </div>
+  </div>
+  <p class="inclass"><b>수업에서는</b> BERT 자료에서 숫자 768개짜리 ‘배’ 벡터를 2차원 그림으로 줄일 때 썼습니다. 계량적 문체 분석의 다차원 척도법(MDS)도 같은 목적(많은 차원을 2차원 지도로)의 방법입니다.</p>
+</section>
+</main>
+
+<script>
+const $ = s => document.querySelector(s);
+const reduce = matchMedia("(prefers-reduced-motion: reduce)").matches;
+const css = v => getComputedStyle(document.documentElement).getPropertyValue(v).trim();
+
+/* 1. 벡터 */
+function arrow(x1, y1, x2, y2, cls, hcls) {
+  const a = Math.atan2(y2 - y1, x2 - x1), L = Math.hypot(x2 - x1, y2 - y1);
+  if (L < 1) return "";
+  const h = 9, p1 = [x2 - h * Math.cos(a - .4), y2 - h * Math.sin(a - .4)], p2 = [x2 - h * Math.cos(a + .4), y2 - h * Math.sin(a + .4)];
+  return `<line class="${cls}" x1="${x1}" y1="${y1}" x2="${x2}" y2="${y2}"/><polygon class="${hcls}" points="${x2},${y2} ${p1} ${p2}"/>`;
+}
+function plane(max, labx = "‘음식’ 개수", laby = "‘노래’ 개수") {
+  const O = 40, S = 240 / max; let g = "";
+  for (let i = 1; i <= max; i++) g += `<line class="grid" x1="${O + i * S}" y1="20" x2="${O + i * S}" y2="260"/><line class="grid" x1="${O}" y1="${260 - i * S}" x2="280" y2="${260 - i * S}"/><text x="${O + i * S}" y="276" text-anchor="middle">${i}</text><text x="${O - 8}" y="${264 - i * S}" text-anchor="end">${i}</text>`;
+  g += `<line class="ax" x1="${O}" y1="260" x2="285" y2="260"/><line class="ax" x1="${O}" y1="15" x2="${O}" y2="260"/><text x="285" y="292" text-anchor="end">${labx}</text><text x="${O}" y="11">${laby}</text>`;
+  return { g, X: v => O + v * S, Y: v => 260 - v * S };
+}
+function drawVec() {
+  const a = [+$("#ax").value, +$("#ay").value], b = [+$("#bx").value, +$("#by").value];
+  ["ax", "ay", "bx", "by"].forEach(k => $("#" + k + "o").textContent = $("#" + k).value);
+  const P = plane(5);
+  $("#vecSvg").innerHTML = P.g + arrow(P.X(0), P.Y(0), P.X(a[0]), P.Y(a[1]), "va", "ha") + arrow(P.X(0), P.Y(0), P.X(b[0]), P.Y(b[1]), "vb", "hb") +
+    `<text x="${P.X(a[0]) + 6}" y="${P.Y(a[1]) - 6}" style="fill:var(--a);font-weight:600">A (${a})</text><text x="${P.X(b[0]) + 6}" y="${P.Y(b[1]) - 6}" style="fill:var(--b);font-weight:600">B (${b})</text>`;
+  $("#vecMsg").innerHTML = `글 A = (${a[0]}, ${a[1]}), 글 B = (${b[0]}, ${b[1]}). 화살표의 끝이 가까울수록 두 글의 형태소 구성이 비슷합니다.`;
+}
+["ax", "ay", "bx", "by"].forEach(k => $("#" + k).oninput = drawVec); drawVec();
+
+/* 2. 길이와 방향 */
+let normed = false;
+function drawLen() {
+  const r = +$("#rep").value; $("#repo").textContent = r;
+  const a0 = [2, 1], b0 = [1, 2], a = a0.map(v => v * r), b = b0;
+  const la = Math.hypot(...a), lb = Math.hypot(...b);
+  const cos = (a[0] * b[0] + a[1] * b[1]) / (la * lb);
+  $("#lenA").textContent = normed ? "1.000" : la.toFixed(3); $("#lenB").textContent = normed ? "1.000" : lb.toFixed(3);
+  $("#ang").textContent = (Math.acos(cos) * 180 / Math.PI).toFixed(1) + "°"; $("#cos").textContent = cos.toFixed(3);
+  const max = normed ? 1.2 : 8, P = plane(normed ? 1 : 8, "‘음식’", "‘노래’");
+  const sc = normed ? 240 / 1.2 : 30, O = 40, X = v => O + v * sc, Y = v => 260 - v * sc;
+  const A = normed ? a.map(v => v / la) : a, B = normed ? b.map(v => v / lb) : b;
+  let g = normed ? `<line class="ax" x1="${O}" y1="260" x2="285" y2="260"/><line class="ax" x1="${O}" y1="15" x2="${O}" y2="260"/><path class="unit" d="M${X(1)},${Y(0)} A${sc},${sc} 0 0 0 ${X(0)},${Y(1)}"/><text x="${X(1)}" y="276" text-anchor="middle">1</text><text x="${O - 8}" y="${Y(1) + 4}" text-anchor="end">1</text>` : P.g;
+  const ra = 34, aa = Math.atan2(A[1], A[0]), ab = Math.atan2(B[1], B[0]);
+  g += `<path class="arcl" d="M${O + ra * Math.cos(aa)},${260 - ra * Math.sin(aa)} A${ra},${ra} 0 0 0 ${O + ra * Math.cos(ab)},${260 - ra * Math.sin(ab)}"/>`;
+  g += arrow(X(0), Y(0), X(A[0]), Y(A[1]), "va", "ha") + arrow(X(0), Y(0), X(B[0]), Y(B[1]), "vb", "hb");
+  g += `<text x="${X(A[0]) + 6}" y="${Y(A[1]) + 4}" style="fill:var(--a);font-weight:600">A</text><text x="${X(B[0]) + 6}" y="${Y(B[1]) - 4}" style="fill:var(--b);font-weight:600">B</text>`;
+  $("#lenSvg").innerHTML = g;
+}
+$("#rep").oninput = drawLen;
+$("#normBtn").onclick = () => { normed = !normed; $("#normBtn").setAttribute("aria-pressed", normed); drawLen(); };
+drawLen();
+
+/* 3. 로그 */
+function drawLog() {
+  const x = Math.max(1, Math.round(Math.pow(10, +$("#lx").value / 100)));
+  $("#lxo").textContent = x.toLocaleString();
+  $("#lnx").textContent = Math.log(x).toFixed(3);
+  $("#lnx2").textContent = `ln ${(2 * x).toLocaleString()} = ${Math.log(2 * x).toFixed(3)}`;
+  const W = 320, H = 220, L = 34, B = 30, xmax = 1000, ymax = Math.log(xmax);
+  const X = v => L + (W - L - 10) * v / xmax, Y = v => 10 + (H - 10 - B) * (1 - v / ymax);
+  let p = ""; for (let i = 1; i <= 1000; i += 3) p += (i === 1 ? "M" : "L") + X(i).toFixed(1) + "," + Y(Math.log(i)).toFixed(1);
+  $("#logSvg").innerHTML = `<line class="ax" x1="${L}" y1="${H - B}" x2="${W - 10}" y2="${H - B}"/><line class="ax" x1="${L}" y1="10" x2="${L}" y2="${H - B}"/>
+    ${[0, 250, 500, 750, 1000].map(t => `<text x="${X(t)}" y="${H - B + 15}" text-anchor="middle">${t}</text>`).join("")}
+    ${[0, 2, 4, 6].map(t => `<text x="${L - 6}" y="${Y(t) + 4}" text-anchor="end">${t}</text>`).join("")}
+    <text x="${W - 10}" y="${H - 2}" text-anchor="end">x</text><text x="${L + 4}" y="20">ln x</text>
+    <path class="curve" d="${p}"/><circle class="dot" r="6" cx="${X(Math.min(x, 1000))}" cy="${Y(Math.log(Math.min(x, 1000)))}"/>`;
+}
+$("#lx").oninput = drawLog; drawLog();
+
+/* 4. 가중합 (가중치: 수업 분류기의 일본어 가중치) */
+const WROWS = [["으니까/EC", 0.3, 2.06], ["어서/EC", 0.2, 2.87], ["하노이/NNP", 0.4, -0.69], ["습니다/EF", 0.15, -0.75]];
+function drawW() {
+  $("#wTable").innerHTML = `<tr><th>형태소</th><th>글의 값 (TF-IDF)</th><th></th><th>일본어 가중치</th><th></th><th>곱</th></tr>` +
+    WROWS.map((r, i) => `<tr><td>${r[0]}</td><td><input type="number" step="0.1" id="wv${i}" value="${r[1]}" aria-label="${r[0]} 값"></td><td>×</td><td><input type="number" step="0.1" id="ww${i}" value="${r[2]}" aria-label="${r[0]} 가중치"></td><td>=</td><td class="num" id="wp${i}"></td></tr>`).join("");
+  WROWS.forEach((_, i) => { $("#wv" + i).oninput = calcW; $("#ww" + i).oninput = calcW; });
+  calcW();
+}
+function calcW() {
+  let s = 0;
+  WROWS.forEach((_, i) => { const p = (+$("#wv" + i).value || 0) * (+$("#ww" + i).value || 0); s += p; $("#wp" + i).textContent = p.toFixed(2); });
+  $("#wz").textContent = s.toFixed(2);
+}
+drawW();
+
+/* 5. softmax */
+const SL = ["베트남어", "일본어", "중국어"], SC = ["a", "c", "b"];
+function drawSoft() {
+  const z = [0, 1, 2].map(k => +$("#z" + k).value);
+  z.forEach((v, k) => $("#z" + k + "o").textContent = v.toFixed(1));
+  const e = z.map(Math.exp), s = e.reduce((a, b) => a + b, 0), mx = Math.max(...e, 1);
+  $("#expBars").innerHTML = SL.map((l, k) => `<div class="bar ${SC[k]}"><span>${l}</span><div class="track"><div class="fill" style="width:${e[k] / Math.max(mx, Math.exp(3)) * 100}%"></div></div><span class="val">${e[k].toFixed(2)}</span></div>`).join("");
+  $("#probBars").innerHTML = SL.map((l, k) => `<div class="bar ${SC[k]}"><span>${l}</span><div class="track"><div class="fill" style="width:${e[k] / s * 100}%"></div></div><span class="val">${(e[k] / s).toFixed(3)}</span></div>`).join("");
+}
+[0, 1, 2].forEach(k => $("#z" + k).oninput = drawSoft);
+$("#shift").onclick = () => { const z = [0, 1, 2].map(k => +$("#z" + k).value); if (Math.max(...z) + 1 > 3) [0, 1, 2].forEach(k => $("#z" + k).value = z[k] - 1); else [0, 1, 2].forEach(k => $("#z" + k).value = z[k] + 1); drawSoft(); };
+$("#spread").onclick = () => { const z = [0, 1, 2].map(k => +$("#z" + k).value), m = z.reduce((a, b) => a + b, 0) / 3; [0, 1, 2].forEach(k => $("#z" + k).value = Math.max(-3, Math.min(3, m + 2 * (z[k] - m)))); drawSoft(); };
+drawSoft();
+
+/* 6. 학습: 경사 하강법 (예시 자료) */
+const DATA = [[0, 0], [0.3, 0], [0.6, 0], [1.0, 0], [1.6, 0], [1.2, 1], [2.0, 1], [2.4, 1], [3.0, 1], [3.6, 1]];
+let w, b, epoch, hist, timer = null;
+const sig = t => 1 / (1 + Math.exp(-t));
+function loss() { return DATA.reduce((s, [x, y]) => { const p = Math.min(1 - 1e-9, Math.max(1e-9, sig(w * x + b))); return s - (y ? Math.log(p) : Math.log(1 - p)); }, 0) / DATA.length; }
+function resetTrain() { w = -1; b = 0.5; epoch = 0; hist = [loss()]; drawTrain(); }
+function stepTrain() {
+  const lr = +$("#lr").value; let gw = 0, gb = 0;
+  DATA.forEach(([x, y]) => { const e = sig(w * x + b) - y; gw += e * x; gb += e; });
+  w -= lr * gw / DATA.length; b -= lr * gb / DATA.length; epoch++; hist.push(loss()); drawTrain();
+}
+function drawTrain() {
+  $("#lro").textContent = (+$("#lr").value).toFixed(2);
+  const W = 320, H = 220, L = 34, B = 30, X = v => L + (W - L - 10) * v / 4, Y = v => 14 + (H - 14 - B) * (1 - v);
+  let p = ""; for (let i = 0; i <= 80; i++) { const x = 4 * i / 80; p += (i ? "L" : "M") + X(x).toFixed(1) + "," + Y(sig(w * x + b)).toFixed(1); }
+  $("#fitSvg").innerHTML = `<line class="ax" x1="${L}" y1="${H - B}" x2="${W - 10}" y2="${H - B}"/><line class="ax" x1="${L}" y1="14" x2="${L}" y2="${H - B}"/>
+    <line class="grid" x1="${L}" y1="${Y(.5)}" x2="${W - 10}" y2="${Y(.5)}"/>
+    <text x="${L - 6}" y="${Y(1) + 4}" text-anchor="end">1</text><text x="${L - 6}" y="${Y(.5) + 4}" text-anchor="end">0.5</text><text x="${L - 6}" y="${Y(0) + 4}" text-anchor="end">0</text>
+    <text x="${W - 10}" y="${H - 6}" text-anchor="end">‘-으니까’의 값</text>
+    <path class="curve" d="${p}"/>
+    ${DATA.map(([x, y]) => `<circle class="${y ? "p1" : "p0"}" r="6" cx="${X(x)}" cy="${Y(y)}" stroke="var(--panel)" stroke-width="1.5"/>`).join("")}
+    <text x="${L + 6}" y="${Y(1) + 18}" style="fill:var(--c)">● 일본어</text><text x="${L + 6}" y="${Y(0) - 8}" style="fill:var(--b)">● 일본어 아님</text>`;
+  const n = Math.max(30, hist.length), mx = Math.max(1.5, ...hist), XL = i => L + (W - L - 10) * i / (n - 1), YL = v => 14 + (H - 14 - B) * (1 - Math.min(v, mx) / mx);
+  $("#lossSvg").innerHTML = `<line class="ax" x1="${L}" y1="${H - B}" x2="${W - 10}" y2="${H - B}"/><line class="ax" x1="${L}" y1="14" x2="${L}" y2="${H - B}"/>
+    <text x="${L - 6}" y="${YL(mx) + 4}" text-anchor="end">${mx.toFixed(1)}</text><text x="${L - 6}" y="${YL(0) + 4}" text-anchor="end">0</text>
+    <text x="${W - 10}" y="${H - 6}" text-anchor="end">걸음 수</text><text x="${L + 4}" y="24">손실 (틀린 정도)</text>
+    <path class="curve" d="${hist.map((v, i) => (i ? "L" : "M") + XL(i).toFixed(1) + "," + YL(v).toFixed(1)).join("")}"/>
+    <circle class="dot" r="5" cx="${XL(hist.length - 1)}" cy="${YL(hist[hist.length - 1])}"/>`;
+  $("#ep").textContent = epoch; $("#ww").textContent = w.toFixed(2); $("#ll").textContent = hist[hist.length - 1].toFixed(3);
+  $("#acc").textContent = DATA.filter(([x, y]) => (sig(w * x + b) >= .5) === !!y).length + " / 10";
+}
+$("#trainStep").onclick = () => { clearInterval(timer); timer = null; $("#trainPlay").textContent = "학습 재생"; stepTrain(); };
+$("#trainReset").onclick = () => { clearInterval(timer); timer = null; $("#trainPlay").textContent = "학습 재생"; resetTrain(); };
+$("#trainPlay").onclick = () => {
+  if (timer) { clearInterval(timer); timer = null; $("#trainPlay").textContent = "학습 재생"; return; }
+  $("#trainPlay").textContent = "멈춤";
+  timer = setInterval(() => { if (epoch >= 200) { clearInterval(timer); timer = null; $("#trainPlay").textContent = "학습 재생"; return; } stepTrain(); }, reduce ? 20 : 90);
+};
+$("#lr").oninput = () => $("#lro").textContent = (+$("#lr").value).toFixed(2);
+resetTrain();
+
+/* 7. 훈련과 시험 */
+$("#dots").innerHTML = Array.from({ length: 300 }, () => "<i></i>").join("");
+$("#splitBtn").onclick = () => {
+  const ds = [...document.querySelectorAll("#dots i")]; ds.forEach(d => d.classList.remove("t"));
+  const idx = ds.map((_, i) => i).sort(() => Math.random() - .5).slice(0, 60);
+  idx.forEach((i, k) => setTimeout(() => ds[i].classList.add("t"), reduce ? 0 : k * 18));
+};
+[...document.querySelectorAll("#dots i")].forEach((d, i) => { if ((i * 37) % 5 === 0) d.classList.add("t"); });
+$("#accBars").innerHTML = [["훈련 데이터", .915, "a"], ["시험 데이터", .833, ""], ["4급 글", .758, "c"], ["찍기", 1 / 3, "b"]]
+  .map(([l, v, c]) => `<div class="bar ${c}"><span>${l}</span><div class="track"><div class="fill" style="width:${v * 100}%"></div></div><span class="val">${(v * 100).toFixed(1)}%</span></div>`).join("");
+
+/* 8. 차원 줄이기 */
+const PTS = (() => { let s = 7; const r = () => { s = (s * 9301 + 49297) % 233280; return s / 233280; };
+  const g = () => { let u = 0; for (let i = 0; i < 6; i++) u += r(); return u - 3; };
+  return Array.from({ length: 90 }, (_, i) => { const k = i % 3, cx = [-1.6, 0, 1.6][k], t = g() * 0.35; return { k, p: [cx + t + g() * .25, g() * .35 + cx * .2, g() * .3 + cx * .9] }; }); })();
+let theta = 20 * Math.PI / 180, anim = null;
+function proj(p, th) { // y축을 중심으로 th만큼 돌린 뒤 (x, y)를 그림자로
+  const c = Math.cos(th), s = Math.sin(th); return [p[0] * c + p[2] * s, p[1], -p[0] * s + p[2] * c];
+}
+function spread(th) { const xs = PTS.map(q => proj(q.p, th)[0]), ys = PTS.map(q => proj(q.p, th)[1]); const v = a => { const m = a.reduce((x, y) => x + y, 0) / a.length; return a.reduce((x, y) => x + (y - m) ** 2, 0) / a.length; }; return v(xs) + v(ys); }
+const COLS = () => [css("--a"), css("--b"), css("--c")];
+function draw3d() {
+  const cv = $("#c3d"), ctx = cv.getContext("2d"), W = cv.width, H = cv.height; ctx.clearRect(0, 0, W, H);
+  const col = COLS(), tilt = .45;
+  const P = PTS.map(q => { const r = proj(q.p, theta); const y = r[1] * Math.cos(tilt) - r[2] * Math.sin(tilt), z = r[1] * Math.sin(tilt) + r[2] * Math.cos(tilt); return { k: q.k, x: W / 2 + r[0] * 75, y: H / 2 - y * 75, z }; }).sort((a, b) => a.z - b.z);
+  P.forEach(p => { ctx.globalAlpha = .55 + .4 * (p.z + 3) / 6; ctx.fillStyle = col[p.k]; ctx.beginPath(); ctx.arc(p.x, p.y, 7, 0, 7); ctx.fill(); });
+  ctx.globalAlpha = 1;
+  const c2 = $("#c2d"), x2 = c2.getContext("2d"); x2.clearRect(0, 0, W, H);
+  PTS.forEach(q => { const r = proj(q.p, theta); x2.fillStyle = col[q.k]; x2.globalAlpha = .8; x2.beginPath(); x2.arc(W / 2 + r[0] * 75, H / 2 - r[1] * 75, 7, 0, 7); x2.fill(); });
+  x2.globalAlpha = 1;
+  $("#roto").textContent = Math.round(theta * 180 / Math.PI) + "°"; $("#spreadV").textContent = spread(theta).toFixed(2);
+}
+$("#rot").oninput = e => { cancelAnimationFrame(anim); theta = +e.target.value * Math.PI / 180; draw3d(); };
+$("#bestBtn").onclick = () => {
+  let best = 0, bv = -1; for (let d = 0; d <= 180; d++) { const v = spread(d * Math.PI / 180); if (v > bv) { bv = v; best = d; } }
+  const start = theta, end = best * Math.PI / 180, t0 = performance.now(), dur = reduce ? 1 : 1200;
+  cancelAnimationFrame(anim);
+  const tick = now => { const u = Math.min(1, (now - t0) / dur), e = u < .5 ? 2 * u * u : 1 - (-2 * u + 2) ** 2 / 2; theta = start + (end - start) * e; $("#rot").value = Math.round(theta * 180 / Math.PI); draw3d(); if (u < 1) anim = requestAnimationFrame(tick); };
+  anim = requestAnimationFrame(tick);
+};
+draw3d();
+matchMedia("(prefers-color-scheme: dark)").addEventListener("change", draw3d);
+</script>
+</body></html>
