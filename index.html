@@ -10,7 +10,7 @@
 :root {
   --bg: #f5f7f8; --panel: #ffffff; --ink: #17222b; --muted: #5d6b76; --line: #d6dde2; --soft: #eef2f4;
   --a1: #0f7b6c; --a1-soft: #d7efe9;   /* 어휘 계량 */
-  --a2: #c47a12; --a2-soft: #fbecd2;   /* 기초 개념 */
+  --a2: #c47a12; --a2-soft: #fbecd2; --a2-txt: #9a5f0c;   /* 기초 개념 (글자용은 조금 진하게) */
   --a3: #b4452f; --a3-soft: #f6ded8;   /* TF-IDF */
   --a4: #3c5fa8; --a4-soft: #dde5f5;   /* BERT */
   --f-display: "Gowun Batang", "Nanum Myeongjo", serif;
@@ -20,13 +20,13 @@
 @media (prefers-color-scheme: dark) {
   :root:not([data-theme="light"]) {
     --bg: #12181d; --panel: #1a2229; --ink: #e6ecef; --muted: #9aa8b2; --line: #2e3a43; --soft: #222c34;
-    --a1: #4fc3ad; --a1-soft: #173a35; --a2: #f0a742; --a2-soft: #3b2c14;
+    --a1: #4fc3ad; --a1-soft: #173a35; --a2: #f0a742; --a2-soft: #3b2c14; --a2-txt: #f0a742;
     --a3: #ef8a72; --a3-soft: #3d2420; --a4: #8aa7e8; --a4-soft: #1f2a42; color-scheme: dark;
   }
 }
 :root[data-theme="dark"] {
   --bg: #12181d; --panel: #1a2229; --ink: #e6ecef; --muted: #9aa8b2; --line: #2e3a43; --soft: #222c34;
-  --a1: #4fc3ad; --a1-soft: #173a35; --a2: #f0a742; --a2-soft: #3b2c14;
+  --a1: #4fc3ad; --a1-soft: #173a35; --a2: #f0a742; --a2-soft: #3b2c14; --a2-txt: #f0a742;
   --a3: #ef8a72; --a3-soft: #3d2420; --a4: #8aa7e8; --a4-soft: #1f2a42; color-scheme: dark;
 }
 * { box-sizing: border-box; }
@@ -68,13 +68,13 @@ a.card {
 }
 a.card:hover { border-color: var(--accent, var(--line)); border-left-color: var(--accent, var(--line)); box-shadow: 0 6px 18px rgb(23 34 43 / .07); transform: translateY(-1px); }
 a.card:focus-visible { outline: 2px solid var(--accent, var(--ink)); outline-offset: 3px; }
-.num { font-family: var(--f-num); font-size: 13px; line-height: 1.9; color: var(--accent, var(--muted)); letter-spacing: .04em; }
+.num { font-family: var(--f-num); font-size: 13px; line-height: 1.9; color: var(--accent-txt, var(--accent, var(--muted))); letter-spacing: .04em; }
 .body { display: grid; gap: 4px; min-width: 0; }
 .kicker { font-size: 12.5px; letter-spacing: .04em; color: var(--muted); font-weight: 600; }
 .desc { font-size: 15px; color: var(--muted); max-width: 62ch; }
 .tags { display: flex; flex-wrap: wrap; gap: 5px; margin: 6px 0 0; padding: 0; list-style: none; }
 .tags li { font-size: 12.5px; color: var(--ink); background: var(--accent-soft, var(--soft)); border-radius: 5px; padding: 2px 8px; }
-.go { font-family: var(--f-num); font-size: 17px; color: var(--accent, var(--muted)); line-height: 1.6; text-align: right; transition: transform .2s ease; }
+.go { font-family: var(--f-num); font-size: 17px; color: var(--accent-txt, var(--accent, var(--muted))); line-height: 1.6; text-align: right; transition: transform .2s ease; }
 a.card:hover .go { transform: translateX(3px); }
 
 /* 안내 */
@@ -133,7 +133,7 @@ footer { font-size: 13px; color: var(--muted); }
     </div>
     <ol class="cards">
       <li>
-        <a class="card" href="concepts_basics.html" style="--accent: var(--a2); --accent-soft: var(--a2-soft);">
+        <a class="card" href="concepts_basics.html" style="--accent: var(--a2); --accent-soft: var(--a2-soft); --accent-txt: var(--a2-txt);">
           <span class="num">02</span>
           <span class="body">
             <span class="kicker">문서 분류 · 기초 개념 · 8절</span>
