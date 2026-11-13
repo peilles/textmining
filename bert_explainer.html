@@ -119,10 +119,15 @@ table { border-collapse: collapse; font-size: 14px; }
 th, td { border-bottom: 1px solid var(--line); padding: 7px 10px; text-align: left; vertical-align: top; }
 th { font-weight: 600; color: var(--muted); font-size: 13px; }
 @media (prefers-reduced-motion: reduce) { * { transition: none !important; animation: none !important; } }
+.crumbs { margin: 0; font-size: 13px; }
+.crumbs a { color: var(--muted); text-decoration: none; }
+.crumbs a:hover, .crumbs a:focus-visible { color: var(--ink); text-decoration: underline; text-underline-offset: 3px; }
+@media print { .crumbs { display: none; } }
 </style>
 </head><body>
 <main>
 <header>
+    <nav class="crumbs" aria-label="목차"><a href="index.html">← 한국어 텍스트 마이닝 목차</a></nav>
   <div class="eyebrow">한국어 텍스트 마이닝 · 문서 분류</div>
   <h1>BERT는 글을 어떻게 읽나</h1>
   <p class="lead">TF-IDF는 형태소의 <b>개수</b>만 봅니다. BERT는 토큰마다 <b>문맥에 따라 달라지는 벡터</b>를 만들고, 그 벡터로 분류합니다. 3~5절의 그림과 숫자는 2025년 수업에서 학습자 글로 미세 조정한 모델(klue/bert-base)을 실제로 돌려 얻은 값입니다.</p>

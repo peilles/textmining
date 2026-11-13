@@ -97,10 +97,15 @@ canvas { width: 100%; max-width: 100%; height: auto; background: var(--soft); bo
 .dots i { aspect-ratio: 1; border-radius: 50%; background: var(--a); transition: background .4s, transform .4s; }
 .dots i.t { background: var(--hi); transform: scale(.8); }
 @media (prefers-reduced-motion: reduce) { * { transition: none !important; } }
+.crumbs { margin: 0; font-size: 13px; }
+.crumbs a { color: var(--muted); text-decoration: none; }
+.crumbs a:hover, .crumbs a:focus-visible { color: var(--ink); text-decoration: underline; text-underline-offset: 3px; }
+@media print { .crumbs { display: none; } }
 </style>
 </head><body>
 <main>
 <header>
+    <nav class="crumbs" aria-label="목차"><a href="index.html">← 한국어 텍스트 마이닝 목차</a></nav>
   <div class="eyebrow">한국어 텍스트 마이닝 · 문서 분류</div>
   <h1>문서 분류의 기초 개념</h1>
   <p class="lead">문서 분류와 BERT에서 처음 나오는 수학 개념을 계산 없이 감으로 익히는 자료입니다. 개념마다 쉬운 비유를 먼저 보고, 직접 움직여 본 뒤, 수업 자료의 어디에 쓰이는지 확인합니다.</p>
