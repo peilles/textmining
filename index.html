@@ -1,7 +1,7 @@
 <!doctype html>
 <html lang="ko"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <title>한국어 텍스트 마이닝 · 수업 자료</title>
-<meta name="description" content="한국어 텍스트 마이닝 수업 자료 목차. TTR과 MATTR, 문서 분류의 기초 개념, TF-IDF와 분류기, BERT는 글을 어떻게 읽나.">
+<meta name="description" content="한국어 텍스트 마이닝 수업 자료 목차. TTR과 MATTR, 문서 분류의 기초 개념, TF-IDF와 분류기, BERT는 글을 어떻게 읽나, 감성 분석의 원리.">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Gowun+Batang:wght@700&family=IBM+Plex+Sans+KR:wght@400;500;600&family=IBM+Plex+Mono:wght@500&display=swap">
@@ -13,6 +13,7 @@
   --a2: #c47a12; --a2-soft: #fbecd2; --a2-txt: #9a5f0c;   /* 기초 개념 (글자용은 조금 진하게) */
   --a3: #b4452f; --a3-soft: #f6ded8;   /* TF-IDF */
   --a4: #3c5fa8; --a4-soft: #dde5f5;   /* BERT */
+  --a5: #7a4b9c; --a5-soft: #ece2f3;   /* 감성 분석 */
   --f-display: "Gowun Batang", "Nanum Myeongjo", serif;
   --f-body: "IBM Plex Sans KR", "Apple SD Gothic Neo", "Malgun Gothic", sans-serif;
   --f-num: "IBM Plex Mono", ui-monospace, monospace;
@@ -21,13 +22,13 @@
   :root:not([data-theme="light"]) {
     --bg: #12181d; --panel: #1a2229; --ink: #e6ecef; --muted: #9aa8b2; --line: #2e3a43; --soft: #222c34;
     --a1: #4fc3ad; --a1-soft: #173a35; --a2: #f0a742; --a2-soft: #3b2c14; --a2-txt: #f0a742;
-    --a3: #ef8a72; --a3-soft: #3d2420; --a4: #8aa7e8; --a4-soft: #1f2a42; color-scheme: dark;
+    --a3: #ef8a72; --a3-soft: #3d2420; --a4: #8aa7e8; --a4-soft: #1f2a42; --a5: #c39be0; --a5-soft: #33243f; color-scheme: dark;
   }
 }
 :root[data-theme="dark"] {
   --bg: #12181d; --panel: #1a2229; --ink: #e6ecef; --muted: #9aa8b2; --line: #2e3a43; --soft: #222c34;
   --a1: #4fc3ad; --a1-soft: #173a35; --a2: #f0a742; --a2-soft: #3b2c14; --a2-txt: #f0a742;
-  --a3: #ef8a72; --a3-soft: #3d2420; --a4: #8aa7e8; --a4-soft: #1f2a42; color-scheme: dark;
+  --a3: #ef8a72; --a3-soft: #3d2420; --a4: #8aa7e8; --a4-soft: #1f2a42; --a5: #c39be0; --a5-soft: #33243f; color-scheme: dark;
 }
 * { box-sizing: border-box; }
 body {
@@ -98,9 +99,9 @@ footer { font-size: 13px; color: var(--muted); }
   <header class="top">
     <div class="eyebrow">수업 자료 · 목차</div>
     <h1>한국어 텍스트 마이닝</h1>
-    <p class="lead">글을 세는 일에서 시작해, 글을 나누는 모델까지. 수업에서 함께 보는 설명 자료 네 편을 읽는 순서대로 모았습니다.</p>
+    <p class="lead">글을 세는 일에서 시작해, 글을 나누는 모델까지. 수업에서 함께 보는 설명 자료 다섯 편을 읽는 순서대로 모았습니다.</p>
     <hr class="rule">
-    <div class="meta"><span>자료 <b>4편</b></span><span>단원 <b>2</b></span><span>자료마다 <b>직접 조작</b>하는 부분이 있습니다</span></div>
+    <div class="meta"><span>자료 <b>5편</b></span><span>단원 <b>3</b></span><span>자료마다 <b>직접 조작</b>하는 부분이 있습니다</span></div>
   </header>
 
   <section class="unit" aria-labelledby="u1">
@@ -171,10 +172,32 @@ footer { font-size: 13px; color: var(--muted); }
     </ol>
   </section>
 
+  <section class="unit" aria-labelledby="u3">
+    <div class="unit-head">
+      <div class="eyebrow">단원 03 · 감성 분석</div>
+      <h2 id="u3">글에 담긴 긍정과 부정 재기</h2>
+      <p class="unit-lead">사람이 만든 감성 사전으로 점수를 매기는 방법과 리뷰에서 배운 분류기를 나란히 놓고, 분야가 바뀌거나 정답이 없는 자료에서는 어떻게 되는지 봅니다.</p>
+    </div>
+    <ol class="cards">
+      <li>
+        <a class="card" href="sentiment_explainer.html" style="--accent: var(--a5); --accent-soft: var(--a5-soft);">
+          <span class="num">05</span>
+          <span class="body">
+            <span class="kicker">감성 분석 · 7절</span>
+            <h3>감성 분석의 원리</h3>
+            <span class="desc">감성 사전으로 한 형태소씩 점수를 더하고 부정어 규칙을 켜고 꺼 봅니다. 분류기의 가중치와 시그모이드로 긍정 확률이 나오는 과정을 따라간 뒤, 영화 리뷰와 쇼핑 후기에서 뜻이 뒤집히는 말과 뉴스 기사에서 점수를 만든 말을 확인합니다.</span>
+            <ul class="tags"><li>감성 사전</li><li>부정어 규칙</li><li>시그모이드</li><li>단어 주머니</li><li>분야 바꾸기</li></ul>
+          </span>
+          <span class="go" aria-hidden="true">→</span>
+        </a>
+      </li>
+    </ol>
+  </section>
+
   <section class="about" aria-labelledby="about">
     <h2 id="about" style="font-size: 20px;">자료에 대하여</h2>
     <ul>
-      <li>TF-IDF 자료의 분류기 수치(시험 정확도 <b>83.3%</b>)와 BERT 자료의 그림·숫자는 수업 노트북에서 실제로 학습하고 실행해 얻은 값입니다.</li>
+      <li>TF-IDF 자료의 분류기 수치(시험 정확도 <b>83.3%</b>)와 BERT 자료의 그림·숫자, 감성 분석 자료의 가중치와 정확도는 수업 노트북에서 실제로 학습하고 실행해 얻은 값입니다.</li>
       <li>자료는 모두 한 단으로 되어 있어 휴대폰에서도 읽을 수 있고, 기기 설정이 어두운 화면이면 자동으로 어두운 화면으로 바뀝니다.</li>
       <li>설명이 어렵거나 고칠 곳이 있으면 수업 시간에 알려 주세요. 더 보고 싶은 주제도 함께 정하면 좋겠습니다.</li>
     </ul>

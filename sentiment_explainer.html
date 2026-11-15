@@ -1,0 +1,456 @@
+<!doctype html>
+<html lang="ko"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>감성 분석의 원리</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Gowun+Batang:wght@700&family=IBM+Plex+Sans+KR:wght@400;500;600&family=IBM+Plex+Mono:wght@500&display=swap">
+<style>
+/* 강의 화면용 설명 페이지 (문서 분류 자료와 같은 틀): 좁은 한 단, 절마다 [조작 → 표·막대 → 한 줄 설명] */
+:root {
+  --bg: #f5f7f8; --panel: #ffffff; --ink: #17222b; --muted: #5d6b76; --line: #d6dde2; --soft: #eef2f4;
+  --pos: #1d6fa3; --pos-soft: #dbeaf5;   /* 긍정 */
+  --neg: #b4452f; --neg-soft: #f6ded8;   /* 부정 */
+  --hi: #c47a12; --hi-soft: #fbecd2;     /* 강조 */
+  --f-display: "Gowun Batang", "Nanum Myeongjo", serif;
+  --f-body: "IBM Plex Sans KR", "Apple SD Gothic Neo", "Malgun Gothic", sans-serif;
+  --f-num: "IBM Plex Mono", ui-monospace, monospace;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --bg: #12181d; --panel: #1a2229; --ink: #e6ecef; --muted: #9aa8b2; --line: #2e3a43; --soft: #222c34;
+    --pos: #7db8e4; --pos-soft: #1b2f40; --neg: #ef8a72; --neg-soft: #3d2420; --hi: #f0a742; --hi-soft: #3b2c14; color-scheme: dark;
+  }
+}
+:root[data-theme="dark"] {
+  --bg: #12181d; --panel: #1a2229; --ink: #e6ecef; --muted: #9aa8b2; --line: #2e3a43; --soft: #222c34;
+  --pos: #7db8e4; --pos-soft: #1b2f40; --neg: #ef8a72; --neg-soft: #3d2420; --hi: #f0a742; --hi-soft: #3b2c14; color-scheme: dark;
+}
+* { box-sizing: border-box; }
+body {
+  margin: 0; background: var(--bg); color: var(--ink); font-family: var(--f-body); font-size: 16px; line-height: 1.65;
+  padding-left: max(16px, env(safe-area-inset-left, 0px)); padding-right: max(16px, env(safe-area-inset-right, 0px));
+  padding-block: 32px 56px;
+}
+main { max-width: 880px; margin: 0 auto; display: grid; gap: 28px; }
+header { display: grid; gap: 6px; }
+h1 { font-family: var(--f-display); font-size: clamp(30px, 6vw, 42px); line-height: 1.2; margin: 0; text-wrap: balance; }
+h2 { font-family: var(--f-display); font-size: 24px; line-height: 1.3; margin: 0; text-wrap: balance; }
+p { margin: 0; max-width: 68ch; }
+a { color: var(--pos); }
+.lead { color: var(--muted); }
+nav.toc { display: flex; flex-wrap: wrap; gap: 6px 14px; font-size: 14px; }
+section.panel { background: var(--panel); border: 1px solid var(--line); border-radius: 10px; padding: 22px clamp(16px, 3vw, 28px); display: grid; gap: 16px; min-width: 0; }
+.eyebrow { font-size: 13px; letter-spacing: .06em; color: var(--muted); font-weight: 600; }
+.note { font-size: 14px; color: var(--muted); }
+.analogy { border-left: 3px solid var(--hi); padding: 4px 0 4px 14px; }
+.formula { font-family: var(--f-num); font-size: 15px; background: var(--soft); border-radius: 6px; padding: 10px 14px; overflow-x: auto; white-space: nowrap; }
+.controls { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
+button {
+  font: 500 14px var(--f-body); color: var(--ink); background: var(--bg); border: 1px solid var(--line);
+  border-radius: 6px; padding: 7px 14px; cursor: pointer;
+}
+button:hover { border-color: var(--muted); }
+button.primary { background: var(--ink); color: var(--panel); border-color: var(--ink); }
+button[aria-pressed="true"] { background: var(--hi-soft); border-color: var(--hi); }
+button:focus-visible, input:focus-visible, select:focus-visible { outline: 2px solid var(--hi); outline-offset: 2px; }
+label.slider { display: inline-flex; gap: 8px; align-items: center; font-size: 14px; color: var(--muted); flex-wrap: wrap; }
+label.slider output { font-family: var(--f-num); color: var(--ink); min-width: 4ch; }
+input[type=range] { width: min(320px, 70vw); accent-color: var(--hi); }
+select { font: 500 14px var(--f-body); color: var(--ink); background: var(--bg); border: 1px solid var(--line); border-radius: 6px; padding: 6px 10px; max-width: 100%; }
+.scroll { overflow-x: auto; }
+table { border-collapse: collapse; font-size: 14px; font-variant-numeric: tabular-nums; }
+th, td { border-bottom: 1px solid var(--line); padding: 5px 8px; text-align: center; white-space: nowrap; }
+th { font-weight: 600; color: var(--muted); font-size: 13px; }
+td.l, th.l { text-align: left; }
+.num { font-family: var(--f-num); font-size: 13px; }
+
+/* 형태소 칩 */
+.chips { display: flex; flex-wrap: wrap; gap: 6px; align-items: flex-start; }
+.chip { font-size: 14px; padding: 3px 9px; border-radius: 5px; border: 1px solid var(--line); background: var(--bg); color: var(--ink); display: inline-grid; gap: 0; text-align: center; transition: opacity .3s, background .3s, border-color .3s, transform .3s; }
+.chip small { font-family: var(--f-num); font-size: 11px; color: var(--muted); }
+button.chip { padding: 3px 9px; font: inherit; font-size: 14px; }
+.chip.pos { background: var(--pos-soft); border-color: var(--pos); }
+.chip.neg { background: var(--neg-soft); border-color: var(--neg); }
+.chip.dim { opacity: .4; }
+.chip.off { opacity: .3; text-decoration: line-through; }
+.chip.unk { border-style: dashed; color: var(--muted); }
+.chip.now { transform: translateY(-4px); box-shadow: 0 0 0 2px var(--hi); }
+.chip.flip { box-shadow: 0 0 0 2px var(--hi); }
+.chip.bi { border-style: dotted; }
+.flipmark { font-size: 11px; color: var(--hi); font-weight: 600; }
+
+/* 점수 */
+.result { display: flex; flex-wrap: wrap; gap: 10px 22px; align-items: baseline; }
+.big { font-family: var(--f-num); font-size: 30px; }
+.verdict { font-size: 18px; font-weight: 600; }
+.v-pos { color: var(--pos); } .v-neg { color: var(--neg); } .v-unk { color: var(--muted); }
+
+/* 시그모이드 */
+.two { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 20px; align-items: center; }
+@media (max-width: 680px) { .two { grid-template-columns: minmax(0, 1fr); } }
+svg { max-width: 100%; height: auto; display: block; }
+svg text { fill: var(--muted); font-family: var(--f-num); font-size: 11px; }
+svg .axis { stroke: var(--line); }
+svg .curve { stroke: var(--hi); fill: none; stroke-width: 2.5; }
+svg .dot { fill: var(--hi); stroke: var(--panel); stroke-width: 2; transition: cx .35s, cy .35s; }
+svg .guide { stroke: var(--muted); stroke-dasharray: 3 3; opacity: .6; transition: all .35s; }
+
+/* 기여 막대 (가운데 0) */
+.contrib { display: grid; gap: 4px; }
+.crow { display: grid; grid-template-columns: 8.5em minmax(0, 1fr) 4.2em; gap: 8px; align-items: center; font-size: 13px; }
+.crow .lab { font-family: var(--f-num); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.track { position: relative; height: 16px; background: var(--soft); border-radius: 3px; overflow: hidden; }
+.track .mid { position: absolute; left: 50%; top: 0; bottom: 0; width: 1px; background: var(--muted); opacity: .5; }
+.track .seg { position: absolute; top: 2px; bottom: 2px; border-radius: 2px; transition: left .4s ease, width .4s ease; }
+.seg.p { background: var(--pos); } .seg.n { background: var(--neg); }
+.crow .val { font-family: var(--f-num); text-align: right; }
+
+/* 확률 막대 */
+.pbar { display: grid; grid-template-columns: 6em minmax(0, 1fr) 4em; gap: 8px; align-items: center; font-size: 14px; }
+.pbar .t { height: 20px; background: var(--neg-soft); border-radius: 4px; overflow: hidden; position: relative; }
+.pbar .f { height: 100%; background: var(--pos); width: 0; transition: width .45s ease; }
+.pbar .half { position: absolute; left: 50%; top: 0; bottom: 0; width: 1px; background: var(--ink); opacity: .4; }
+.pbar .v { font-family: var(--f-num); text-align: right; }
+
+.cards { display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: 12px; }
+.card { border: 1px solid var(--line); border-radius: 8px; padding: 12px 14px; display: grid; gap: 8px; min-width: 0; }
+.card h3 { font-size: 15px; margin: 0; }
+.legend { display: flex; flex-wrap: wrap; gap: 14px; font-size: 13px; color: var(--muted); }
+.legend span::before { content: ""; display: inline-block; width: 12px; height: 12px; border-radius: 3px; margin-right: 6px; vertical-align: -1px; }
+.lg-pos::before { background: var(--pos); } .lg-neg::before { background: var(--neg); }
+.headline { display: grid; gap: 6px; padding: 10px 0; border-bottom: 1px solid var(--line); }
+.headline:last-child { border-bottom: 0; }
+.hl-text { font-size: 15px; }
+mark { background: transparent; border-bottom: 2px solid; padding: 0 1px; color: inherit; }
+mark.p { border-color: var(--pos); } mark.n { border-color: var(--neg); }
+mark.gone { border-color: transparent; text-decoration: line-through; opacity: .5; }
+.score { font-family: var(--f-num); font-size: 13px; color: var(--muted); }
+@media (prefers-reduced-motion: reduce) { * { transition: none !important; animation: none !important; } }
+</style>
+</head><body>
+<main>
+<header>
+  <div class="eyebrow">한국어 텍스트 마이닝 · 감성 분석</div>
+  <h1>감성 분석의 원리</h1>
+  <p class="lead">감성 사전으로 점수를 매기는 방법과, 리뷰에서 배운 분류기가 긍정 확률을 내는 방법을 단계별로 봅니다. 숫자는 수업 노트북의 실제 감성 사전(KNU)과 실제 분류기(영화 리뷰 2만 편, 쇼핑 후기 2만 편으로 학습)의 값입니다.</p>
+  <p class="note">가중합, 로그, 훈련과 시험이 낯설면 먼저 <a href="concepts_basics.html">문서 분류의 기초 개념</a>을, TF-IDF가 낯설면 <a href="tfidf_classifier.html">TF-IDF와 분류기</a>를 보세요.</p>
+  <nav class="toc" aria-label="차례">
+    <a href="#lexicon">1. 감성 사전으로 점수 매기기</a><a href="#sigmoid">2. 점수를 확률로</a><a href="#weights">3. 배운 가중치로 판단하기</a>
+    <a href="#cmp">4. 사람의 사전과 배운 사전</a><a href="#order">5. 순서를 모르는 문제</a><a href="#domain">6. 분야가 바뀌면</a><a href="#news">7. 정답이 없는 자료</a>
+  </nav>
+</header>
+
+<!-- 1 -->
+<section class="panel" id="lexicon">
+  <div class="eyebrow">1차시 2~4절</div>
+  <h2>1. 감성 사전으로 점수 매기기</h2>
+  <p class="analogy">시험 채점과 같습니다. 답안(리뷰)에서 정답표(감성 사전)에 있는 낱말을 찾아 점수를 더합니다. 정답표에 없는 낱말은 점수가 없습니다.</p>
+  <div class="controls">
+    <select id="lexSel" aria-label="문장 고르기"></select>
+    <button class="primary" id="lexPlay">한 형태소씩 보기</button>
+    <button id="lexNeg" aria-pressed="false">부정어 규칙 켜기</button>
+  </div>
+  <div class="chips" id="lexChips" aria-live="polite"></div>
+  <div class="result"><span>합계 <span class="big" id="lexSum">0</span></span><span class="verdict" id="lexVerdict"></span></div>
+  <p class="note">칩의 위 줄은 형태소 분석 결과, 아래 줄은 사전에서 찾을 말과 점수입니다. 동사·형용사는 어간에 ‘다’를, 어근(XR)은 ‘하다’를 붙여 찾습니다. 점선 칩은 사전에서 찾지 않거나 사전에 없는 형태소입니다.</p>
+  <p class="note" id="lexNote"></p>
+</section>
+
+<!-- 2 -->
+<section class="panel" id="sigmoid">
+  <div class="eyebrow">1차시 5절</div>
+  <h2>2. 점수를 확률로: 시그모이드</h2>
+  <p>학습 기반 분류기도 처음에는 점수를 냅니다. 형태소마다 <b>가중치</b>를 곱해 더한 값(가중합) z입니다. z가 클수록 긍정, 작을수록 부정 쪽입니다. 이 점수를 0과 1 사이의 <b>긍정 확률</b>로 바꾸는 식이 시그모이드(sigmoid)입니다.</p>
+  <div class="formula">긍정 확률 = 1 ÷ (1 + e<sup>−z</sup>)</div>
+  <div class="two">
+    <div>
+      <svg id="sigSvg" viewBox="0 0 360 220" role="img" aria-label="시그모이드 곡선"></svg>
+    </div>
+    <div style="display:grid;gap:12px">
+      <label class="slider">점수 z <input type="range" id="sigZ" min="-8" max="8" step="0.1" value="0"><output id="sigZo">0.0</output></label>
+      <div class="result"><span>긍정 확률 <span class="big" id="sigP">0.50</span></span><span class="verdict" id="sigV"></span></div>
+      <p class="note">z = 0이면 확률 0.5(반반), z가 커질수록 1에, 작아질수록 0에 다가가지만 끝내 닿지는 않습니다. 부류가 둘이면 문서 분류의 softmax와 같은 계산입니다.</p>
+    </div>
+  </div>
+</section>
+
+<!-- 3 -->
+<section class="panel" id="weights">
+  <div class="eyebrow">1차시 5~6절</div>
+  <h2>3. 배운 가중치로 판단하기</h2>
+  <p class="analogy">분류기의 가중치는 <b>자료에서 배운 감성 사전</b>입니다. 사람이 만든 사전과 달리 모든 형태소에 점수가 있고, 그 점수를 리뷰 2만 편에서 스스로 정했습니다.</p>
+  <div class="controls"><select id="wSel" aria-label="문장 고르기"></select><button id="wReset">빼낸 형태소 되돌리기</button></div>
+  <div class="legend"><span class="lg-pos">긍정 쪽 가중치</span><span class="lg-neg">부정 쪽 가중치</span></div>
+  <div class="chips" id="wChips"></div>
+  <p class="note">칩을 누르면 그 형태소를 빼고 다시 계산합니다. 아래 줄의 숫자가 가중치입니다. 점선 칩은 훈련 리뷰에 3편 미만으로 나와 가중치가 없는 형태소입니다.</p>
+  <div class="contrib" id="wBars"></div>
+  <div class="formula" id="wFormula"></div>
+  <div class="pbar"><span>긍정 확률</span><div class="t"><div class="f" id="wFill"></div><div class="half"></div></div><span class="v" id="wP"></span></div>
+  <p class="note">막대는 형태소마다 (TF-IDF × 가중치), 곧 판단에 보탠 몫입니다. 몫을 모두 더하고 절편 b를 더한 것이 z이고, 2절의 시그모이드로 확률을 냅니다.</p>
+  <p class="note" id="wNote"></p>
+</section>
+
+<!-- 4 -->
+<section class="panel" id="cmp">
+  <div class="eyebrow">1차시 6절</div>
+  <h2>4. 사람이 만든 사전과 자료에서 배운 사전</h2>
+  <p>같은 말이 두 사전에서 어떤 점수를 받았는지 비교합니다. 감성 사전은 −2~+2, 가중치는 대략 −6~+6 범위입니다.</p>
+  <div class="scroll"><table id="cmpTable"><thead><tr><th class="l">형태소</th><th>감성 사전</th><th class="l">학습한 가중치 (영화 리뷰)</th></tr></thead><tbody></tbody></table></div>
+  <p class="note">‘눈물’, ‘슬프다’는 일상에서는 나쁜 일이라 사전에서 부정이지만, 영화 리뷰에서는 감동했다는 칭찬이라 긍정으로 배웠습니다. ‘재밌다’, ‘쓰레기’, ‘ㅠㅠ’는 사전에 아예 없습니다.</p>
+</section>
+
+<!-- 5 -->
+<section class="panel" id="order">
+  <div class="eyebrow">1차시 7절 · 심화</div>
+  <h2>5. 순서를 모르는 문제: 단어 주머니와 바이그램</h2>
+  <p class="analogy">단어 주머니는 문장을 낱말 카드로 잘라 주머니에 넣고 흔든 것과 같습니다. 어떤 카드가 몇 장 있는지는 알지만 어떤 순서였는지는 모릅니다.</p>
+  <div class="controls">
+    <button id="ordBag" aria-pressed="false">주머니에 넣기 (가나다순으로 늘어놓기)</button>
+    <button id="ordBi" aria-pressed="false">이웃한 두 형태소 묶음 더하기</button>
+  </div>
+  <div class="cards" id="ordCards"></div>
+  <p class="note" id="ordNote"></p>
+</section>
+
+<!-- 6 -->
+<section class="panel" id="domain">
+  <div class="eyebrow">2차시 2~3절</div>
+  <h2>6. 분야가 바뀌면</h2>
+  <p>영화 리뷰로 배운 분류기와 쇼핑 후기로 배운 분류기에 같은 문장을 넣어 봅니다. 같은 형태소라도 분야에 따라 가중치의 부호가 뒤집힙니다.</p>
+  <div class="controls"><select id="dSel" aria-label="문장 고르기"></select></div>
+  <div class="cards" id="dCards"></div>
+  <div class="scroll"><table id="flipTable"><thead><tr><th class="l">형태소</th><th>영화 가중치</th><th>쇼핑 가중치</th><th class="l">읽는 법</th></tr></thead><tbody></tbody></table></div>
+  <p class="note">학습 기반 분류기는 배운 분야의 말버릇까지 배웁니다. 영화 분류기는 쇼핑 후기의 ‘ㅠㅠ’(속상함)를 감동의 ‘ㅠㅠ’로 읽어 긍정으로 판단합니다.</p>
+</section>
+
+<!-- 7 -->
+<section class="panel" id="news">
+  <div class="eyebrow">2차시 4절</div>
+  <h2>7. 정답이 없는 자료: 점수를 만든 말 보기</h2>
+  <p>뉴스 기사에는 긍정·부정 정답이 없습니다. 그래서 점수를 믿기 전에 <b>어떤 말이 점수를 만들었는지</b> 봐야 합니다. 밑줄이 감성 사전에서 찾은 말입니다.</p>
+  <div class="controls"><button id="newsDrop" aria-pressed="false">점수를 크게 만든 말 빼기 (‘감사’, ‘안전’, ‘장애인’)</button></div>
+  <div id="newsList"></div>
+  <ul class="note" style="margin:0;padding-left:1.2em;display:grid;gap:4px">
+    <li><b>동음이의어</b>: 국정 ‘감사’(검사)를 고마움의 ‘감사’(+2)로 셉니다. 형태소 분석은 둘 다 ‘감사/NNG’입니다.</li>
+    <li><b>주제어</b>: ‘안전’, ‘범죄’는 기자의 평가가 아니라 기사의 주제입니다.</li>
+    <li><b>사전의 편향</b>: ‘장애인’(−2)처럼 대상을 가리키는 말에도 점수가 있어, 그 대상을 다룬 기사는 내용과 상관없이 부정으로 기웁니다.</li>
+  </ul>
+</section>
+
+<p class="note">자료: 네이버 영화 리뷰 말뭉치(NSMC, CC0), 네이버 쇼핑 후기(bab2min/corpus, Public Domain), KNU 한국어 감성사전(군산대 DILab), 빅카인즈 기사 제목을 본뜬 예문. 형태소 분석: Kiwi.</p>
+</main>
+
+<script>
+const DATA = {"lex": [{"s": "정말 최고의 영화, 감동 그 자체", "ms": [{"m": "정말/MAG", "w": "정말", "s": null}, {"m": "최고/NNG", "w": "최고", "s": 2}, {"m": "의/JKG", "w": null, "s": null}, {"m": "영화/NNG", "w": "영화", "s": null}, {"m": ",/SP", "w": null, "s": null}, {"m": "감동/NNG", "w": "감동", "s": 2}, {"m": "그/MM", "w": null, "s": null}, {"m": "자체/NNG", "w": "자체", "s": null}]}, {"s": "지루하고 유치한 내용에 실망했다", "ms": [{"m": "지루/XR", "w": "지루하다", "s": -1}, {"m": "하/XSA", "w": null, "s": null}, {"m": "고/EC", "w": null, "s": null}, {"m": "유치/XR", "w": "유치하다", "s": -1}, {"m": "하/XSA", "w": null, "s": null}, {"m": "ᆫ/ETM", "w": null, "s": null}, {"m": "내용/NNG", "w": "내용", "s": null}, {"m": "에/JKB", "w": null, "s": null}, {"m": "실망/NNG", "w": "실망", "s": -2}, {"m": "하/XSV", "w": null, "s": null}, {"m": "었/EP", "w": null, "s": null}, {"m": "다/EF", "w": null, "s": null}]}, {"s": "그냥 그랬어요", "ms": [{"m": "그냥/MAG", "w": "그냥", "s": null}, {"m": "그렇/VA-I", "w": "그렇다", "s": null}, {"m": "었/EP", "w": null, "s": null}, {"m": "어요/EF", "w": null, "s": null}]}, {"s": "지루하지 않았다", "ms": [{"m": "지루/XR", "w": "지루하다", "s": -1}, {"m": "하/XSA", "w": null, "s": null}, {"m": "지/EC", "w": null, "s": null}, {"m": "않/VX", "w": null, "s": null}, {"m": "었/EP", "w": null, "s": null}, {"m": "다/EF", "w": null, "s": null}]}, {"s": "전혀 좋지 않다", "ms": [{"m": "전혀/MAG", "w": "전혀", "s": null}, {"m": "좋/VA", "w": "좋다", "s": 2}, {"m": "지/EC", "w": null, "s": null}, {"m": "않/VX", "w": null, "s": null}, {"m": "다/EF", "w": null, "s": null}]}, {"s": "재밌게 봤어요 명작", "ms": [{"m": "재밌/VA", "w": "재밌다", "s": null}, {"m": "게/EC", "w": null, "s": null}, {"m": "보/VV", "w": "보다", "s": null}, {"m": "었/EP", "w": null, "s": null}, {"m": "어요/EF", "w": null, "s": null}, {"m": "명/NNB", "w": null, "s": null}, {"m": "작/NNG", "w": "작", "s": null}]}, {"s": "꿀잼 보장", "ms": [{"m": "꿀/NNG", "w": "꿀", "s": null}, {"m": "잼/NNG", "w": "잼", "s": null}, {"m": "보장/NNG", "w": "보장", "s": null}]}, {"s": "눈물이 났다", "ms": [{"m": "눈물/NNG", "w": "눈물", "s": -1}, {"m": "이/JKS", "w": null, "s": null}, {"m": "나/VV", "w": "나다", "s": null}, {"m": "었/EP", "w": null, "s": null}, {"m": "다/EF", "w": null, "s": null}]}], "weights": [{"s": "배우들 연기가 정말 좋았다", "toks": [{"m": "배우/NNG", "idf": 4.5405, "w": -0.965}, {"m": "들/XSN", "idf": 3.1951, "w": 0.1055}, {"m": "연기/NNG", "idf": 4.1618, "w": 1.5628}, {"m": "가/JKS", "idf": 2.7844, "w": -1.1073}, {"m": "정말/MAG", "idf": 3.8235, "w": 1.7801}, {"m": "좋/VA", "idf": 3.5569, "w": 4.5967}, {"m": "었/EP", "idf": 2.2659, "w": 0.6717}, {"m": "다/EF", "idf": 2.3479, "w": 0.3052}], "b": -0.2931, "p": 0.9059}, {"s": "돈 주고 보기 아깝다", "toks": [{"m": "돈/NNG", "idf": 5.1702, "w": -3.1106}, {"m": "주/VV", "idf": 4.3411, "w": -0.8738}, {"m": "고/EC", "idf": 2.4611, "w": 0.2964}, {"m": "보/VV", "idf": 2.3467, "w": 1.3268}, {"m": "기/ETN", "idf": 3.7552, "w": -1.0442}, {"m": "아깝/VA-I", "idf": 4.4868, "w": -4.66}, {"m": "다/EF", "idf": 2.3479, "w": 0.3052}], "b": -0.2931, "p": 0.0125}, {"s": "눈물이 났다", "toks": [{"m": "눈물/NNG", "idf": 5.6052, "w": 3.0228}, {"m": "이/JKS", "idf": 2.3663, "w": 0.1709}, {"m": "나/VV", "idf": 4.5632, "w": -0.829}, {"m": "었/EP", "idf": 2.2659, "w": 0.6717}, {"m": "다/EF", "idf": 2.3479, "w": 0.3052}], "b": -0.2931, "p": 0.8343}, {"s": "시간 가는 줄 몰랐다", "toks": [{"m": "시간/NNG", "idf": 4.7132, "w": -2.0488}, {"m": "가/VV", "idf": 4.6344, "w": -0.0555}, {"m": "는/ETM", "idf": 2.3835, "w": 1.0182}, {"m": "줄/NNB", "idf": 5.2406, "w": 0.2408}, {"m": "모르/VV", "idf": 4.8514, "w": 0.4812}, {"m": "었/EP", "idf": 2.2659, "w": 0.6717}, {"m": "다/EF", "idf": 2.3479, "w": 0.3052}], "b": -0.2931, "p": 0.3894}, {"s": "이런 영화를 왜 만들었는지 모르겠다", "toks": [{"m": "이런/MM", "idf": 4.2663, "w": 0.1697}, {"m": "영화/NNG", "idf": 2.1505, "w": 0.4208}, {"m": "를/JKO", "idf": 3.2548, "w": -0.6218}, {"m": "왜/MAG", "idf": 4.2821, "w": -0.0443}, {"m": "만들/VV", "idf": 4.2065, "w": -2.445}, {"m": "었/EP", "idf": 2.2659, "w": 0.6717}, {"m": "는지/EC", "idf": 5.4271, "w": -1.2631}, {"m": "모르/VV", "idf": 4.8514, "w": 0.4812}, {"m": "겠/EP", "idf": 4.2689, "w": -1.6163}, {"m": "다/EF", "idf": 2.3479, "w": 0.3052}], "b": -0.2931, "p": 0.1275}, {"s": "10점 만점에 10점", "toks": [{"m": "10/SN", "idf": 4.7987, "w": 3.2342}, {"m": "점/NNB", "idf": 4.0201, "w": -0.5542}, {"m": "만점/NNG", "idf": 6.7927, "w": 2.4729}, {"m": "에/JKB", "idf": 2.7016, "w": -0.0536}, {"m": "10/SN", "idf": 4.7987, "w": 3.2342}, {"m": "점/NNB", "idf": 4.0201, "w": -0.5542}], "b": -0.2931, "p": 0.9364}], "order": [{"s": "재미있었고 지루하지 않았다", "uni": {"toks": [{"m": "재미있/VA", "idf": 4.7277, "w": 3.6738}, {"m": "었/EP", "idf": 2.2659, "w": 0.6717}, {"m": "고/EC", "idf": 2.4611, "w": 0.2964}, {"m": "지루/XR", "idf": 4.6949, "w": -3.937}, {"m": "하/XSA", "idf": 2.4563, "w": 0.0482}, {"m": "지/EC", "idf": 3.4884, "w": -0.7706}, {"m": "않/VX", "idf": 4.0481, "w": 0.4838}, {"m": "었/EP", "idf": 2.2659, "w": 0.6717}, {"m": "다/EF", "idf": 2.3479, "w": 0.3052}], "b": -0.2931, "p": 0.4923}, "bi": {"toks": [{"m": "재미있/VA", "idf": 4.7277, "w": 3.9716}, {"m": "었/EP", "idf": 2.2659, "w": 0.3382}, {"m": "고/EC", "idf": 2.4611, "w": -0.1415}, {"m": "지루/XR", "idf": 4.6949, "w": -2.963}, {"m": "하/XSA", "idf": 2.4563, "w": 0.1547}, {"m": "지/EC", "idf": 3.4884, "w": -0.8183}, {"m": "않/VX", "idf": 4.0481, "w": -0.1157}, {"m": "었/EP", "idf": 2.2659, "w": 0.3382}, {"m": "다/EF", "idf": 2.3479, "w": -0.1696}, {"m": "재미있/VA_었/EP", "idf": 6.6131, "w": 1.0708}, {"m": "었/EP_고/EC", "idf": 5.7619, "w": 0.6362}, {"m": "고/EC_지루/XR", "idf": 7.0323, "w": -0.4872}, {"m": "지루/XR_하/XSA", "idf": 4.7256, "w": -2.7306}, {"m": "하/XSA_지/EC", "idf": 6.1586, "w": 1.1049}, {"m": "지/EC_않/VX", "idf": 4.351, "w": 1.1739}, {"m": "않/VX_었/EP", "idf": 6.1244, "w": -0.2839}, {"m": "었/EP_다/EF", "idf": 3.6085, "w": 0.531}], "b": -0.1883, "p": 0.5726}, "lex": [{"m": "재미있/VA", "w": "재미있다", "s": 2}, {"m": "었/EP", "w": null, "s": null}, {"m": "고/EC", "w": null, "s": null}, {"m": "지루/XR", "w": "지루하다", "s": -1}, {"m": "하/XSA", "w": null, "s": null}, {"m": "지/EC", "w": null, "s": null}, {"m": "않/VX", "w": null, "s": null}, {"m": "었/EP", "w": null, "s": null}, {"m": "다/EF", "w": null, "s": null}]}, {"s": "지루했고 재미있지 않았다", "uni": {"toks": [{"m": "지루/XR", "idf": 4.6949, "w": -3.937}, {"m": "하/XSA", "idf": 2.4563, "w": 0.0482}, {"m": "었/EP", "idf": 2.2659, "w": 0.6717}, {"m": "고/EC", "idf": 2.4611, "w": 0.2964}, {"m": "재미있/VA", "idf": 4.7277, "w": 3.6738}, {"m": "지/EC", "idf": 3.4884, "w": -0.7706}, {"m": "않/VX", "idf": 4.0481, "w": 0.4838}, {"m": "었/EP", "idf": 2.2659, "w": 0.6717}, {"m": "다/EF", "idf": 2.3479, "w": 0.3052}], "b": -0.2931, "p": 0.4923}, "bi": {"toks": [{"m": "지루/XR", "idf": 4.6949, "w": -2.963}, {"m": "하/XSA", "idf": 2.4563, "w": 0.1547}, {"m": "었/EP", "idf": 2.2659, "w": 0.3382}, {"m": "고/EC", "idf": 2.4611, "w": -0.1415}, {"m": "재미있/VA", "idf": 4.7277, "w": 3.9716}, {"m": "지/EC", "idf": 3.4884, "w": -0.8183}, {"m": "않/VX", "idf": 4.0481, "w": -0.1157}, {"m": "었/EP", "idf": 2.2659, "w": 0.3382}, {"m": "다/EF", "idf": 2.3479, "w": -0.1696}, {"m": "지루/XR_하/XSA", "idf": 4.7256, "w": -2.7306}, {"m": "하/XSA_었/EP", "idf": 5.2337, "w": -0.0408}, {"m": "었/EP_고/EC", "idf": 5.7619, "w": 0.6362}, {"m": "고/EC_재미있/VA", "idf": 7.768, "w": -0.142}, {"m": "재미있/VA_지/EC", "idf": 8.9576, "w": -0.5701}, {"m": "지/EC_않/VX", "idf": 4.351, "w": 1.1739}, {"m": "않/VX_었/EP", "idf": 6.1244, "w": -0.2839}, {"m": "었/EP_다/EF", "idf": 3.6085, "w": 0.531}], "b": -0.1883, "p": 0.3613}, "lex": [{"m": "지루/XR", "w": "지루하다", "s": -1}, {"m": "하/XSA", "w": null, "s": null}, {"m": "었/EP", "w": null, "s": null}, {"m": "고/EC", "w": null, "s": null}, {"m": "재미있/VA", "w": "재미있다", "s": 2}, {"m": "지/EC", "w": null, "s": null}, {"m": "않/VX", "w": null, "s": null}, {"m": "었/EP", "w": null, "s": null}, {"m": "다/EF", "w": null, "s": null}]}], "domain": [{"s": "색상이 사진과 달라서 아쉽네요 ㅠㅠ", "영화": {"toks": [{"m": "색상/NNG", "idf": null, "w": null}, {"m": "이/JKS", "idf": 2.3663, "w": 0.1709}, {"m": "사진/NNG", "idf": 7.768, "w": 0.381}, {"m": "과/JKB", "idf": 5.3941, "w": 0.3143}, {"m": "다르/VA", "idf": 6.1414, "w": -0.102}, {"m": "어서/EC", "idf": 3.5295, "w": -0.3963}, {"m": "아쉽/VA-I", "idf": 5.5329, "w": 1.1907}, {"m": "네요/EF", "idf": 3.9575, "w": 1.6425}, {"m": "ㅠㅠ/SW", "idf": 5.2234, "w": 1.8333}], "b": -0.2931, "p": 0.8091}, "쇼핑": {"toks": [{"m": "색상/NNG", "idf": 5.32, "w": -0.0236}, {"m": "이/JKS", "idf": 2.1682, "w": -2.4478}, {"m": "사진/NNG", "idf": 5.1541, "w": -0.687}, {"m": "과/JKB", "idf": 5.6513, "w": 0.713}, {"m": "다르/VA", "idf": 5.3126, "w": -1.7937}, {"m": "어서/EC", "idf": 2.2728, "w": 0.1569}, {"m": "아쉽/VA-I", "idf": 4.94, "w": -2.0952}, {"m": "네요/EF", "idf": 2.1716, "w": -0.8139}, {"m": "ㅠㅠ/SW", "idf": 4.3859, "w": -2.7211}], "b": -0.3854, "p": 0.0361}}, {"s": "배송이 10일이나 걸렸어요", "영화": {"toks": [{"m": "배송/NNG", "idf": null, "w": null}, {"m": "이/JKS", "idf": 2.3663, "w": 0.1709}, {"m": "10/SN", "idf": 4.7987, "w": 3.2342}, {"m": "일/NNB", "idf": 7.3482, "w": 0.2726}, {"m": "이나/JX", "idf": 6.2031, "w": -0.3801}, {"m": "걸리/VV", "idf": 6.8962, "w": -1.1751}, {"m": "었/EP", "idf": 2.2659, "w": 0.6717}, {"m": "어요/EF", "idf": 3.8816, "w": 2.4706}], "b": -0.2931, "p": 0.7424}, "쇼핑": {"toks": [{"m": "배송/NNG", "idf": 3.0167, "w": -0.6486}, {"m": "이/JKS", "idf": 2.1682, "w": -2.4478}, {"m": "10/SN", "idf": 5.9131, "w": -1.1573}, {"m": "일/NNB", "idf": 5.4611, "w": -1.6011}, {"m": "이나/JX", "idf": 6.5728, "w": -1.1211}, {"m": "걸리/VV", "idf": 5.251, "w": -0.7347}, {"m": "었/EP", "idf": 1.9422, "w": 0.4171}, {"m": "어요/EF", "idf": 1.7024, "w": 1.5012}], "b": -0.3854, "p": 0.055}}, {"s": "결말이 너무 아쉽다 ㅠㅠ 다시 보고 싶다", "영화": {"toks": [{"m": "결말/NNG", "idf": 5.5903, "w": -0.349}, {"m": "이/JKS", "idf": 2.3663, "w": 0.1709}, {"m": "너무/MAG", "idf": 3.673, "w": 0.3799}, {"m": "아쉽/VA-I", "idf": 5.5329, "w": 1.1907}, {"m": "다/EF", "idf": 2.3479, "w": 0.3052}, {"m": "ㅠㅠ/SW", "idf": 5.2234, "w": 1.8333}, {"m": "다시/MAG", "idf": 4.8055, "w": 2.038}, {"m": "보/VV", "idf": 2.3467, "w": 1.3268}, {"m": "고/EC", "idf": 2.4611, "w": 0.2964}, {"m": "싶/VX", "idf": 4.3814, "w": 1.1365}, {"m": "다/EF", "idf": 2.3479, "w": 0.3052}], "b": -0.2931, "p": 0.9141}, "쇼핑": {"toks": [{"m": "결말/NNG", "idf": null, "w": null}, {"m": "이/JKS", "idf": 2.1682, "w": -2.4478}, {"m": "너무/MAG", "idf": 3.0461, "w": -2.8886}, {"m": "아쉽/VA-I", "idf": 4.94, "w": -2.0952}, {"m": "다/EF", "idf": 5.7976, "w": -0.8583}, {"m": "ㅠㅠ/SW", "idf": 4.3859, "w": -2.7211}, {"m": "다시/MAG", "idf": 4.8972, "w": -1.4038}, {"m": "보/VV", "idf": 4.4642, "w": -0.5622}, {"m": "고/EC", "idf": 1.9106, "w": 1.2532}, {"m": "싶/VX", "idf": 4.9221, "w": 0.4396}, {"m": "다/EF", "idf": 5.7976, "w": -0.8583}], "b": -0.3854, "p": 0.0283}}, {"s": "맛있어요 다시 살게요", "영화": {"toks": [{"m": "맛있/VA", "idf": 8.5056, "w": -0.6481}, {"m": "어요/EF", "idf": 3.8816, "w": 2.4706}, {"m": "다시/MAG", "idf": 4.8055, "w": 2.038}, {"m": "사/VV", "idf": 6.5091, "w": 0.3568}, {"m": "ᆯ게요/EF", "idf": 8.2645, "w": 0.4276}], "b": -0.2931, "p": 0.7376}, "쇼핑": {"toks": [{"m": "맛있/VA", "idf": 4.425, "w": 5.7247}, {"m": "어요/EF", "idf": 1.7024, "w": 1.5012}, {"m": "다시/MAG", "idf": 4.8972, "w": -1.4038}, {"m": "사/VV", "idf": 3.3228, "w": 1.2571}, {"m": "ᆯ게요/EF", "idf": 5.339, "w": 1.0624}], "b": -0.3854, "p": 0.9499}}], "flip": [["ㅠㅠ/SW", 1.83, -2.72], ["ㅜㅜ/SW", 1.24, -2.81], ["아쉽/VA-I", 1.19, -2.1], ["다시/MAG", 2.04, -1.4], ["10/SN", 3.23, -1.16], ["맛있/VA", -0.65, 5.72], ["이쁘/VA", 1.07, 4.62], ["재밌/VA", 5.91, 0.7], ["지루/XR", -3.94, -0.01], ["최고/NNG", 5.85, 4.32]], "cmp": [["눈물/NNG", -1, 3.02], ["슬프/VA", -2, 3.15], ["감동/NNG", 2, 3.11], ["지루/XR", -1, -3.94], ["재밌/VA", null, 5.91], ["쓰레기/NNG", null, -5.26], ["돈/NNG", null, -3.11], ["명작/NNG", null, 3.59], ["ㅠㅠ/SW", null, 1.83], ["ㅡㅡ/SW", null, -2.43]], "news": [{"s": "이소영 장관, 국감서 소상공인 회복 과제 총력", "ms": [{"m": "이소영/NNP", "w": "이소영", "s": null}, {"m": "장관/NNG", "w": "장관", "s": null}, {"m": ",/SP", "w": null, "s": null}, {"m": "국감/NNG", "w": "국감", "s": null}, {"m": "서/NNG", "w": "서", "s": null}, {"m": "소/XPN", "w": null, "s": null}, {"m": "상공인/NNG", "w": "상공인", "s": null}, {"m": "회복/NNG", "w": "회복", "s": null}, {"m": "과제/NNG", "w": "과제", "s": null}, {"m": "총력/NNG", "w": "총력", "s": null}]}, {"s": "국정감사에서 감사 결과 발표, 의원들 질타 이어져", "ms": [{"m": "국정/NNG", "w": "국정", "s": null}, {"m": "감사/NNG", "w": "감사", "s": 2}, {"m": "에서/JKB", "w": null, "s": null}, {"m": "감사/NNG", "w": "감사", "s": 2}, {"m": "결과/NNG", "w": "결과", "s": null}, {"m": "발표/NNG", "w": "발표", "s": null}, {"m": ",/SP", "w": null, "s": null}, {"m": "의원/NNG", "w": "의원", "s": null}, {"m": "들/XSN", "w": null, "s": null}, {"m": "질타/NNG", "w": "질타", "s": null}, {"m": "이어지/VV", "w": "이어지다", "s": null}, {"m": "어/EF", "w": null, "s": null}]}, {"s": "국토안전관리원, 건설현장 안전 협의회 개최", "ms": [{"m": "국토/NNG", "w": "국토", "s": null}, {"m": "안전/NNG", "w": "안전", "s": 2}, {"m": "관리원/NNG", "w": "관리원", "s": null}, {"m": ",/SP", "w": null, "s": null}, {"m": "건설/NNG", "w": "건설", "s": null}, {"m": "현장/NNG", "w": "현장", "s": null}, {"m": "안전/NNG", "w": "안전", "s": 2}, {"m": "협의회/NNG", "w": "협의회", "s": null}, {"m": "개최/NNG", "w": "개최", "s": null}]}, {"s": "장애인 일자리 지원 사업 확대", "ms": [{"m": "장애인/NNG", "w": "장애인", "s": -2}, {"m": "일자리/NNG", "w": "일자리", "s": null}, {"m": "지원/NNG", "w": "지원", "s": null}, {"m": "사업/NNG", "w": "사업", "s": null}, {"m": "확대/NNG", "w": "확대", "s": null}]}, {"s": "경남 7대 범죄 줄었지만 폭력 절도 여전", "ms": [{"m": "경남/NNP", "w": "경남", "s": null}, {"m": "7/SN", "w": null, "s": null}, {"m": "대/NNG", "w": "대", "s": null}, {"m": "범죄/NNG", "w": "범죄", "s": -2}, {"m": "줄/VV", "w": "줄다", "s": null}, {"m": "었/EP", "w": null, "s": null}, {"m": "지만/EC", "w": null, "s": null}, {"m": "폭력/NNG", "w": "폭력", "s": -2}, {"m": "절도/NNG", "w": "절도", "s": null}, {"m": "여전/XR", "w": "여전하다", "s": null}]}]};
+const $ = s => document.querySelector(s);
+const esc = s => String(s).replace(/[&<>"]/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
+const fmt = (x, d = 2) => (x >= 0 ? '+' : '−') + Math.abs(x).toFixed(d);
+const sig = z => 1 / (1 + Math.exp(-z));
+const reduce = matchMedia('(prefers-reduced-motion: reduce)').matches;
+
+/* ---------- 1. 감성 사전 ---------- */
+const NEG_AFTER = new Set(['않/VX', '못/VX', '없/VA']), NEG_BEFORE = new Set(['안/MAG', '못/MAG']);
+function lexScores(ms, useNeg) {
+  return ms.map((t, i) => {
+    if (t.s === null || t.s === undefined) return { ...t, v: null, flipped: false };
+    let v = t.s, flipped = false;
+    if (useNeg) {
+      const after = ms.slice(i + 1, i + 4).some(x => NEG_AFTER.has(x.m));
+      const before = i > 0 && NEG_BEFORE.has(ms[i - 1].m);
+      if (after || before) { v = -v; flipped = true; }
+    }
+    return { ...t, v, flipped };
+  });
+}
+const verdictOf = s => s > 0 ? ['긍정', 'v-pos'] : s < 0 ? ['부정', 'v-neg'] : ['모름', 'v-unk'];
+let lexNeg = false, lexTimer = null;
+DATA.lex.forEach((x, i) => $('#lexSel').add(new Option(x.s, i)));
+function lexRender(upto = Infinity) {
+  const x = DATA.lex[+$('#lexSel').value];
+  const sc = lexScores(x.ms, lexNeg);
+  let sum = 0;
+  $('#lexChips').innerHTML = sc.map((t, i) => {
+    const shown = i < upto;
+    const hit = t.v !== null;
+    if (shown && hit) sum += t.v;
+    const cls = !shown ? 'dim' : hit ? (t.v > 0 ? 'pos' : t.v < 0 ? 'neg' : '') : 'unk';
+    const sub = t.w === null ? '찾지 않음' : hit ? `${esc(t.w)} ${t.v > 0 ? '+' : ''}${t.v}` : `${esc(t.w)} 없음`;
+    return `<span class="chip ${cls} ${i === upto - 1 ? 'now' : ''} ${shown && t.flipped ? 'flip' : ''}">${esc(t.m)}<small>${sub}</small>${shown && t.flipped ? '<span class="flipmark">부정어로 뒤집힘</span>' : ''}</span>`;
+  }).join('');
+  $('#lexSum').textContent = (sum > 0 ? '+' : '') + sum;
+  const done = upto >= sc.length;
+  const [v, c] = verdictOf(sum);
+  $('#lexVerdict').className = 'verdict ' + (done ? c : 'v-unk');
+  $('#lexVerdict').textContent = done ? '→ ' + v : '계산 중…';
+  const notes = {
+    '지루하지 않았다': '부정어 규칙을 켜면 ‘지루’ 뒤 세 형태소 안의 ‘않/VX’ 때문에 −1이 +1로 뒤집힙니다.',
+    '전혀 좋지 않다': '‘좋다’(+2) 뒤에 ‘않/VX’가 있습니다. 규칙 없이는 긍정, 규칙을 켜면 부정입니다.',
+    '꿀잼 보장': '사전에는 ‘꿀잼’(+1)이 있지만 형태소 분석이 ‘꿀 + 잼’으로 나눠서 찾지 못합니다.',
+    '재밌게 봤어요 명작': '사전에는 ‘재미있다’는 있지만 줄인 말 ‘재밌다’와 ‘명작’은 없습니다.',
+    '그냥 그랬어요': '사전에서 찾은 말이 하나도 없으면 점수가 0이라 판단하지 못합니다(모름).',
+    '눈물이 났다': '사전에서 ‘눈물’은 −1입니다. 영화 리뷰에서는 대개 칭찬인데도 부정으로 판단합니다(4절).'
+  };
+  $('#lexNote').textContent = done ? (notes[x.s] || '') : '';
+}
+$('#lexSel').onchange = () => { clearInterval(lexTimer); lexRender(); };
+$('#lexNeg').onclick = e => { lexNeg = !lexNeg; e.target.setAttribute('aria-pressed', lexNeg); e.target.textContent = lexNeg ? '부정어 규칙 끄기' : '부정어 규칙 켜기'; lexRender(); };
+$('#lexPlay').onclick = () => {
+  clearInterval(lexTimer);
+  const n = DATA.lex[+$('#lexSel').value].ms.length;
+  if (reduce) { lexRender(); return; }
+  let k = 0; lexRender(0);
+  lexTimer = setInterval(() => { k++; lexRender(k); if (k >= n) clearInterval(lexTimer); }, 650);
+};
+lexRender();
+
+/* ---------- 2. 시그모이드 ---------- */
+(function () {
+  const W = 360, H = 220, L = 34, R = 10, T = 12, B = 30;
+  const X = z => L + (z + 8) / 16 * (W - L - R), Y = p => T + (1 - p) * (H - T - B);
+  let path = '';
+  for (let z = -8; z <= 8.001; z += 0.1) path += (path ? 'L' : 'M') + X(z).toFixed(1) + ',' + Y(sig(z)).toFixed(1);
+  $('#sigSvg').innerHTML = `
+    <line class="axis" x1="${L}" y1="${Y(0)}" x2="${W - R}" y2="${Y(0)}"/><line class="axis" x1="${X(0)}" y1="${T}" x2="${X(0)}" y2="${Y(0)}"/>
+    <line class="axis" x1="${L}" y1="${Y(0.5)}" x2="${W - R}" y2="${Y(0.5)}" stroke-dasharray="2 4"/>
+    <text x="${L - 6}" y="${Y(1) + 4}" text-anchor="end">1</text><text x="${L - 6}" y="${Y(0.5) + 4}" text-anchor="end">0.5</text><text x="${L - 6}" y="${Y(0) + 4}" text-anchor="end">0</text>
+    ${[-8, -4, 0, 4, 8].map(z => `<text x="${X(z)}" y="${H - 10}" text-anchor="middle">${z}</text>`).join('')}
+    <path class="curve" d="${path}"/>
+    <line class="guide" id="sgV"/><line class="guide" id="sgH"/><circle class="dot" id="sgDot" r="6"/>`;
+  function upd() {
+    const z = +$('#sigZ').value, p = sig(z);
+    $('#sigZo').textContent = z.toFixed(1);
+    $('#sigP').textContent = p.toFixed(2);
+    const [v, c] = p > 0.5 ? ['긍정', 'v-pos'] : p < 0.5 ? ['부정', 'v-neg'] : ['반반', 'v-unk'];
+    $('#sigV').textContent = '→ ' + v; $('#sigV').className = 'verdict ' + c;
+    const d = $('#sgDot'); d.setAttribute('cx', X(z)); d.setAttribute('cy', Y(p));
+    const gv = $('#sgV'); gv.setAttribute('x1', X(z)); gv.setAttribute('x2', X(z)); gv.setAttribute('y1', Y(0)); gv.setAttribute('y2', Y(p));
+    const gh = $('#sgH'); gh.setAttribute('x1', L); gh.setAttribute('x2', X(z)); gh.setAttribute('y1', Y(p)); gh.setAttribute('y2', Y(p));
+  }
+  $('#sigZ').oninput = upd; upd();
+})();
+
+/* ---------- TF-IDF × 가중치 계산 (sklearn 과 같은 식: tf×idf 를 길이 1로) ---------- */
+function score(info, off = new Set()) {
+  const cnt = new Map();
+  info.toks.forEach((t, i) => { if (t.idf !== null && !off.has(t.m)) cnt.set(t.m, { n: (cnt.get(t.m)?.n || 0) + 1, t }); });
+  let norm = 0; cnt.forEach(({ n, t }) => { norm += (n * t.idf) ** 2; }); norm = Math.sqrt(norm) || 1;
+  const parts = []; let z = info.b;
+  cnt.forEach(({ n, t }, m) => { const c = n * t.idf / norm * t.w; parts.push({ m, c, w: t.w }); z += c; });
+  return { parts, z, p: sig(z) };
+}
+function bars(el, parts, max = 3) {
+  el.innerHTML = parts.slice().sort((a, b) => Math.abs(b.c) - Math.abs(a.c)).map(({ m, c }) => {
+    const w = Math.min(Math.abs(c) / max, 1) * 50;
+    const left = c >= 0 ? 50 : 50 - w;
+    return `<div class="crow"><span class="lab" title="${esc(m)}">${esc(m)}</span><div class="track"><div class="mid"></div><div class="seg ${c >= 0 ? 'p' : 'n'}" style="left:${left}%;width:${w}%"></div></div><span class="val">${fmt(c)}</span></div>`;
+  }).join('');
+}
+
+/* ---------- 3. 가중치 ---------- */
+let wOff = new Set();
+DATA.weights.forEach((x, i) => $('#wSel').add(new Option(x.s, i)));
+function wRender() {
+  const x = DATA.weights[+$('#wSel').value];
+  $('#wChips').innerHTML = x.toks.map(t => {
+    if (t.w === null) return `<span class="chip unk">${esc(t.m)}<small>없음</small></span>`;
+    const cls = wOff.has(t.m) ? 'off' : t.w >= 0 ? 'pos' : 'neg';
+    return `<button class="chip ${cls}" data-m="${esc(t.m)}" aria-pressed="${!wOff.has(t.m)}">${esc(t.m)}<small>${fmt(t.w)}</small></button>`;
+  }).join('');
+  $('#wChips').querySelectorAll('button').forEach(b => b.onclick = () => { const m = b.dataset.m; wOff.has(m) ? wOff.delete(m) : wOff.add(m); wRender(); });
+  const r = score(x, wOff);
+  bars($('#wBars'), r.parts);
+  $('#wFormula').textContent = `z = (몫의 합 ${fmt(r.z - x.b)}) + (절편 b ${fmt(x.b)}) = ${fmt(r.z)}   →   긍정 확률 = 1 ÷ (1 + e^${(-r.z).toFixed(2)}) = ${r.p.toFixed(3)}`;
+  $('#wFill').style.width = (r.p * 100) + '%';
+  $('#wP').textContent = r.p.toFixed(2);
+  const notes = {
+    '돈 주고 보기 아깝다': '‘돈’과 ‘아깝다’가 함께 큰 부정의 몫을 냅니다. 감성 사전에 없는 ‘돈’도 영화 리뷰에서는 강한 부정의 단서입니다.',
+    '눈물이 났다': '‘눈물’의 가중치가 +3.02입니다. 감성 사전의 −1과 반대입니다(4절).',
+    '시간 가는 줄 몰랐다': '칭찬인데 확률이 0.5 아래입니다. ‘시간’이 ‘시간 낭비’처럼 부정 리뷰에 많이 나와 −2.05를 받았기 때문입니다. ‘시간’ 칩을 눌러 빼 보세요.',
+    '이런 영화를 왜 만들었는지 모르겠다': '감성 사전으로는 찾은 말이 없어 ‘모름’이지만, 분류기는 ‘만들다’, ‘-겠-’ 같은 형태소에도 가중치가 있어 부정으로 판단합니다.',
+    '10점 만점에 10점': '리뷰의 ‘10’은 별점이라 강한 긍정의 단서입니다. 뉴스의 날짜나 금액에 나오는 ‘10’에도 똑같이 반응합니다(7절).'
+  };
+  $('#wNote').textContent = notes[x.s] || '형태소 칩을 하나씩 눌러 빼면서 확률이 어떻게 바뀌는지 보세요.';
+}
+$('#wSel').onchange = () => { wOff = new Set(); wRender(); };
+$('#wReset').onclick = () => { wOff = new Set(); wRender(); };
+wRender();
+
+/* ---------- 4. 두 사전 비교 ---------- */
+$('#cmpTable tbody').innerHTML = DATA.cmp.map(([m, s, w]) => {
+  const width = Math.min(Math.abs(w) / 6, 1) * 50, left = w >= 0 ? 50 : 50 - width;
+  const sTxt = s === null ? '<span class="note">없음</span>' : `<span class="num" style="color:var(--${s > 0 ? 'pos' : 'neg'})">${s > 0 ? '+' : ''}${s}</span>`;
+  return `<tr><td class="l num">${esc(m)}</td><td>${sTxt}</td><td class="l"><div class="crow" style="grid-template-columns:minmax(120px,240px) 4em"><div class="track"><div class="mid"></div><div class="seg ${w >= 0 ? 'p' : 'n'}" style="left:${left}%;width:${width}%"></div></div><span class="val">${fmt(w)}</span></div></td></tr>`;
+}).join('');
+
+/* ---------- 5. 순서 ---------- */
+let ordBag = false, ordBi = false;
+function ordRender() {
+  $('#ordCards').innerHTML = DATA.order.map(x => {
+    const info = ordBi ? x.bi : x.uni;
+    let toks = info.toks.slice();
+    if (ordBag) toks.sort((a, b) => a.m.localeCompare(b.m, 'ko'));
+    const chips = toks.map(t => {
+      const isBi = t.m.includes('_');
+      const cls = t.w === null ? 'unk' : t.w >= 0 ? 'pos' : 'neg';
+      return `<span class="chip ${cls} ${isBi ? 'bi' : ''}">${esc(t.m)}<small>${t.w === null ? '없음' : fmt(t.w)}</small></span>`;
+    }).join('');
+    const p = score(info).p;
+    const lexOn = lexScores(x.lex, true).reduce((a, t) => a + (t.v || 0), 0);
+    const [lv, lc] = verdictOf(lexOn);
+    return `<div class="card"><h3>${esc(x.s)}</h3><div class="chips">${chips}</div>
+      <div class="pbar"><span>긍정 확률</span><div class="t"><div class="f" style="width:${p * 100}%"></div><div class="half"></div></div><span class="v">${p.toFixed(2)}</span></div>
+      <div class="note">감성 사전 + 부정어 규칙: <b class="${lc}">${lv}</b> (${lexOn > 0 ? '+' : ''}${lexOn})</div></div>`;
+  }).join('');
+  $('#ordNote').textContent = ordBi
+    ? '‘었/EP_고/EC’, ‘지/EC_않/VX’처럼 이웃한 두 형태소의 묶음(점선 칩)이 더해지자 두 문장이 달라지고 확률도 갈립니다. 순서를 조금은 볼 수 있게 됩니다.'
+    : ordBag
+      ? '가나다순으로 늘어놓으면 두 문장의 형태소가 하나도 다르지 않습니다. 단어 주머니로는 같은 글이므로 확률도 똑같습니다.'
+      : '두 문장은 뜻이 반대입니다. 그런데 분류기의 긍정 확률이 똑같습니다. ‘주머니에 넣기’를 눌러 보세요. 부정어 규칙은 ‘무엇 뒤에 않다가 오는지’ 순서를 보므로 둘을 구별합니다.';
+}
+$('#ordBag').onclick = e => { ordBag = !ordBag; e.target.setAttribute('aria-pressed', ordBag); ordRender(); };
+$('#ordBi').onclick = e => { ordBi = !ordBi; e.target.setAttribute('aria-pressed', ordBi); ordRender(); };
+ordRender();
+
+/* ---------- 6. 분야 ---------- */
+DATA.domain.forEach((x, i) => $('#dSel').add(new Option(x.s, i)));
+function dRender() {
+  const x = DATA.domain[+$('#dSel').value];
+  $('#dCards').innerHTML = ['영화', '쇼핑'].map(k => {
+    const info = x[k], r = score(info);
+    const chips = info.toks.map(t => `<span class="chip ${t.w === null ? 'unk' : t.w >= 0 ? 'pos' : 'neg'}">${esc(t.m)}<small>${t.w === null ? '없음' : fmt(t.w)}</small></span>`).join('');
+    return `<div class="card"><h3>${k} 리뷰로 학습한 분류기</h3><div class="chips">${chips}</div>
+      <div class="pbar"><span>긍정 확률</span><div class="t"><div class="f" style="width:${r.p * 100}%"></div><div class="half"></div></div><span class="v">${r.p.toFixed(2)}</span></div></div>`;
+  }).join('');
+}
+$('#dSel').onchange = dRender; dRender();
+const how = { 'ㅠㅠ/SW': '영화: 감동해서 욺 / 쇼핑: 속상해서 욺', 'ㅜㅜ/SW': '‘ㅠㅠ’와 같음', '아쉽/VA-I': '영화: 끝나서 아쉽다 / 쇼핑: 품질이 아쉽다',
+  '다시/MAG': '다시 보고 싶다 / 다시는 안 산다', '10/SN': '10점 / 10일 걸렸다', '맛있/VA': '쇼핑에서만 강한 칭찬', '이쁘/VA': '쇼핑에서 훨씬 강함',
+  '재밌/VA': '영화에서 훨씬 강함', '지루/XR': '영화에만 있는 불만', '최고/NNG': '두 분야 모두 강한 칭찬' };
+$('#flipTable tbody').innerHTML = DATA.flip.map(([m, a, b]) => `<tr><td class="l num">${esc(m)}</td>
+  <td class="num" style="color:var(--${a >= 0 ? 'pos' : 'neg'})">${fmt(a)}</td><td class="num" style="color:var(--${b >= 0 ? 'pos' : 'neg'})">${fmt(b)}</td><td class="l note">${how[m] || ''}</td></tr>`).join('');
+
+/* ---------- 7. 뉴스 ---------- */
+let drop = false;
+const DROP = new Set(['감사', '안전', '장애인']);
+function newsRender() {
+  $('#newsList').innerHTML = DATA.news.map(x => {
+    let text = x.s, sum = 0;
+    const hits = x.ms.filter(t => t.s !== null && t.s !== undefined);
+    hits.forEach(t => { if (!(drop && DROP.has(t.w))) sum += t.s; });
+    const forms = [...new Set(hits.map(t => t.m.split('/')[0]))].sort((a, b) => b.length - a.length);
+    let html = esc(text);
+    forms.forEach(f => {
+      const t = hits.find(h => h.m.split('/')[0] === f);
+      const cls = drop && DROP.has(t.w) ? 'gone' : t.s > 0 ? 'p' : 'n';
+      html = html.split(esc(f)).join(`<mark class="${cls}" title="${esc(t.w)} ${t.s > 0 ? '+' : ''}${t.s}">${esc(f)}</mark>`);
+    });
+    const [v, c] = verdictOf(sum);
+    const list = hits.map(t => `${t.w} ${t.s > 0 ? '+' : ''}${t.s}`).join(', ') || '찾은 말 없음';
+    return `<div class="headline"><div class="hl-text">${html}</div><div class="score">${esc(list)} → 합계 ${sum > 0 ? '+' : ''}${sum} <b class="${c}">${v}</b></div></div>`;
+  }).join('');
+}
+$('#newsDrop').onclick = e => { drop = !drop; e.target.setAttribute('aria-pressed', drop); newsRender(); };
+newsRender();
+</script>
+</body></html>
