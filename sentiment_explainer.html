@@ -127,10 +127,15 @@ mark.p { border-color: var(--pos); } mark.n { border-color: var(--neg); }
 mark.gone { border-color: transparent; text-decoration: line-through; opacity: .5; }
 .score { font-family: var(--f-num); font-size: 13px; color: var(--muted); }
 @media (prefers-reduced-motion: reduce) { * { transition: none !important; animation: none !important; } }
+.crumbs { margin: 0 0 6px; font-size: 13px; }
+.crumbs a { color: var(--muted); text-decoration: none; }
+.crumbs a:hover, .crumbs a:focus-visible { color: var(--ink); text-decoration: underline; text-underline-offset: 3px; }
+@media print { .crumbs { display: none; } }
 </style>
 </head><body>
 <main>
 <header>
+    <nav class="crumbs" aria-label="목차"><a href="index.html">← 한국어 텍스트 마이닝 목차</a></nav>
   <div class="eyebrow">한국어 텍스트 마이닝 · 감성 분석</div>
   <h1>감성 분석의 원리</h1>
   <p class="lead">감성 사전으로 점수를 매기는 방법과, 리뷰에서 배운 분류기가 긍정 확률을 내는 방법을 단계별로 봅니다. 숫자는 수업 노트북의 실제 감성 사전(KNU)과 실제 분류기(영화 리뷰 2만 편, 쇼핑 후기 2만 편으로 학습)의 값입니다.</p>

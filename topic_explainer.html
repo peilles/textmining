@@ -138,10 +138,15 @@ button.w[aria-pressed="true"] { background: var(--hi-soft); border-color: var(--
 .stat b { font-family: var(--f-num); font-size: 26px; font-weight: 500; }
 @media (max-width: 560px) { .row { grid-template-columns: 7em minmax(0, 1fr) 3.4em; } }
 @media (prefers-reduced-motion: reduce) { * { transition: none !important; animation: none !important; } }
+.crumbs { margin: 0 0 6px; font-size: 13px; }
+.crumbs a { color: var(--muted); text-decoration: none; }
+.crumbs a:hover, .crumbs a:focus-visible { color: var(--ink); text-decoration: underline; text-underline-offset: 3px; }
+@media print { .crumbs { display: none; } }
 </style>
 </head><body>
 <main>
 <header>
+    <nav class="crumbs" aria-label="목차"><a href="index.html">← 한국어 텍스트 마이닝 목차</a></nav>
   <div class="eyebrow">한국어 텍스트 마이닝 · 토픽 모델링</div>
   <h1>토픽 모델링의 원리</h1>
   <p class="lead">정답 없이 글 묶음 안의 주제를 찾는 토픽 모델링(LDA)을 작은 예로 움직여 보고, 수업에서 뉴스 기사 2만 건으로 실제로 학습한 토픽을 살펴봅니다.</p>
