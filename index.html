@@ -1,7 +1,7 @@
 <!doctype html>
 <html lang="ko"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <title>한국어 텍스트 마이닝 · 수업 자료</title>
-<meta name="description" content="한국어 텍스트 마이닝 수업 자료 목차. TTR과 MATTR, 문서 분류의 기초 개념, TF-IDF와 분류기, BERT는 글을 어떻게 읽나, 감성 분석의 원리.">
+<meta name="description" content="한국어 텍스트 마이닝 수업 자료 목차. TTR과 MATTR, 문서 분류의 기초 개념, TF-IDF와 분류기, BERT는 글을 어떻게 읽나, 감성 분석의 원리, 토픽 모델링의 원리.">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Gowun+Batang:wght@700&family=IBM+Plex+Sans+KR:wght@400;500;600&family=IBM+Plex+Mono:wght@500&display=swap">
@@ -14,6 +14,7 @@
   --a3: #b4452f; --a3-soft: #f6ded8;   /* TF-IDF */
   --a4: #3c5fa8; --a4-soft: #dde5f5;   /* BERT */
   --a5: #7a4b9c; --a5-soft: #ece2f3;   /* 감성 분석 */
+  --a6: #1f7f8c; --a6-soft: #d6eef0;   /* 토픽 모델링 */
   --f-display: "Gowun Batang", "Nanum Myeongjo", serif;
   --f-body: "IBM Plex Sans KR", "Apple SD Gothic Neo", "Malgun Gothic", sans-serif;
   --f-num: "IBM Plex Mono", ui-monospace, monospace;
@@ -22,13 +23,13 @@
   :root:not([data-theme="light"]) {
     --bg: #12181d; --panel: #1a2229; --ink: #e6ecef; --muted: #9aa8b2; --line: #2e3a43; --soft: #222c34;
     --a1: #4fc3ad; --a1-soft: #173a35; --a2: #f0a742; --a2-soft: #3b2c14; --a2-txt: #f0a742;
-    --a3: #ef8a72; --a3-soft: #3d2420; --a4: #8aa7e8; --a4-soft: #1f2a42; --a5: #c39be0; --a5-soft: #33243f; color-scheme: dark;
+    --a3: #ef8a72; --a3-soft: #3d2420; --a4: #8aa7e8; --a4-soft: #1f2a42; --a5: #c39be0; --a5-soft: #33243f; --a6: #63c7d3; --a6-soft: #173a3e; color-scheme: dark;
   }
 }
 :root[data-theme="dark"] {
   --bg: #12181d; --panel: #1a2229; --ink: #e6ecef; --muted: #9aa8b2; --line: #2e3a43; --soft: #222c34;
   --a1: #4fc3ad; --a1-soft: #173a35; --a2: #f0a742; --a2-soft: #3b2c14; --a2-txt: #f0a742;
-  --a3: #ef8a72; --a3-soft: #3d2420; --a4: #8aa7e8; --a4-soft: #1f2a42; --a5: #c39be0; --a5-soft: #33243f; color-scheme: dark;
+  --a3: #ef8a72; --a3-soft: #3d2420; --a4: #8aa7e8; --a4-soft: #1f2a42; --a5: #c39be0; --a5-soft: #33243f; --a6: #63c7d3; --a6-soft: #173a3e; color-scheme: dark;
 }
 * { box-sizing: border-box; }
 body {
@@ -99,9 +100,9 @@ footer { font-size: 13px; color: var(--muted); }
   <header class="top">
     <div class="eyebrow">수업 자료 · 목차</div>
     <h1>한국어 텍스트 마이닝</h1>
-    <p class="lead">글을 세는 일에서 시작해, 글을 나누는 모델까지. 수업에서 함께 보는 설명 자료 다섯 편을 읽는 순서대로 모았습니다.</p>
+    <p class="lead">글을 세는 일에서 시작해, 글을 나누는 모델까지. 수업에서 함께 보는 설명 자료 여섯 편을 읽는 순서대로 모았습니다.</p>
     <hr class="rule">
-    <div class="meta"><span>자료 <b>5편</b></span><span>단원 <b>3</b></span><span>자료마다 <b>직접 조작</b>하는 부분이 있습니다</span></div>
+    <div class="meta"><span>자료 <b>6편</b></span><span>단원 <b>4</b></span><span>자료마다 <b>직접 조작</b>하는 부분이 있습니다</span></div>
   </header>
 
   <section class="unit" aria-labelledby="u1">
@@ -194,10 +195,32 @@ footer { font-size: 13px; color: var(--muted); }
     </ol>
   </section>
 
+  <section class="unit" aria-labelledby="u4">
+    <div class="unit-head">
+      <div class="eyebrow">단원 04 · 토픽 모델링</div>
+      <h2 id="u4">정답 없이 주제 찾기</h2>
+      <p class="unit-lead">글 묶음 안에서 함께 나오는 단어들로 주제를 찾는 LDA를 작은 예로 움직여 보고, 뉴스 기사 2만 건에서 찾은 실제 토픽을 읽고 따져 봅니다.</p>
+    </div>
+    <ol class="cards">
+      <li>
+        <a class="card" href="topic_explainer.html" style="--accent: var(--a6); --accent-soft: var(--a6-soft);">
+          <span class="num">06</span>
+          <span class="body">
+            <span class="kicker">토픽 모델링 · 9절</span>
+            <h3>토픽 모델링의 원리</h3>
+            <span class="desc">토픽 주머니에서 단어를 꺼내 글을 만드는 LDA의 가정을 따라가고, 단어에 색을 칠했다 고치며 토픽이 정리되는 과정을 봅니다. 이어서 뉴스 토픽과 기사마다 토픽 비율, 출발점과 토픽 수에 따라 달라지는 결과, 일관성, 짧은 글과 긴 글의 차이를 실제 값으로 확인합니다.</span>
+            <ul class="tags"><li>LDA</li><li>토픽 비율</li><li>깁스 샘플링</li><li>일관성</li><li>토픽 수</li></ul>
+          </span>
+          <span class="go" aria-hidden="true">→</span>
+        </a>
+      </li>
+    </ol>
+  </section>
+
   <section class="about" aria-labelledby="about">
     <h2 id="about" style="font-size: 20px;">자료에 대하여</h2>
     <ul>
-      <li>TF-IDF 자료의 분류기 수치(시험 정확도 <b>83.3%</b>)와 BERT 자료의 그림·숫자, 감성 분석 자료의 가중치와 정확도는 수업 노트북에서 실제로 학습하고 실행해 얻은 값입니다.</li>
+      <li>TF-IDF 자료의 분류기 수치(시험 정확도 <b>83.3%</b>)와 BERT 자료의 그림·숫자, 감성 분석 자료의 가중치와 정확도, 토픽 모델링 자료의 토픽과 일관성은 수업 노트북에서 실제로 학습하고 실행해 얻은 값입니다.</li>
       <li>자료는 모두 한 단으로 되어 있어 휴대폰에서도 읽을 수 있고, 기기 설정이 어두운 화면이면 자동으로 어두운 화면으로 바뀝니다.</li>
       <li>설명이 어렵거나 고칠 곳이 있으면 수업 시간에 알려 주세요. 더 보고 싶은 주제도 함께 정하면 좋겠습니다.</li>
     </ul>
